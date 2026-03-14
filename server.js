@@ -99,7 +99,7 @@ async function lagPDF(data) {
     // Grønn prioritets-indikator
     side.drawRectangle({ x: 40, y: y - 44, width: 4, height: 50, color: green });
 
-    side.drawText(`${t.ikon || "•"} ${t.navn}`, { x: 52, y: y - 18, size: 10, font: fontBold, color: navy });
+    side.drawText(`${t.navn}`, { x: 52, y: y - 18, size: 10, font: fontBold, color: navy });
     side.drawText(t.beskrivelse.slice(0, 65), { x: 52, y: y - 32, size: 8, font: fontNormal, color: grå });
 
     // Tall
