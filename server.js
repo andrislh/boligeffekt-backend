@@ -232,7 +232,7 @@ app.post("/api/create-checkout", async (req, res) => {
       locale: "nb",
     });
 
-    res.json({ url: session.url });
+    res.json({ url: session.url, sessionId: session.id });
   } catch (err) {
     console.error("Stripe feil:", err.message);
     res.status(500).json({ feil: err.message });
