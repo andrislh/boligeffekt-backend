@@ -7,7 +7,8 @@ require("dotenv").config();
 const express  = require("express");
 const stripe   = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const cors     = require("cors");
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
+const resend = new Resend(process.env.RESEND_API_KEY);
 const { PDFDocument, rgb, StandardFonts } = require("pdf-lib");
 
 const app = express();
@@ -18,14 +19,7 @@ app.use(cors({ origin: "*" }));
 app.use("/webhook", express.raw({ type: "application/json" }));
 app.use(express.json());
 
-// ── E-postkonfig (Gmail) ──────────────────────────────────────
-const mailer = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,  // din@gmail.com
-    pass: process.env.EMAIL_PASS,  // App-passord fra Google (ikke vanlig passord)
-  },
-});
+
 
 // ── PDF-generator ─────────────────────────────────────────────
 async function lagPDF(data) {
@@ -143,8 +137,8 @@ async function sendEpost(epost, pdfBytes, data) {
     .filter(t => t.prioritet === "høy")
     .reduce((s, t) => s + t.støtte_snitt, 0);
 
-  await mailer.sendMail({
-    from: `"BoligEffekt" <${process.env.EMAIL_USER}>`,
+  await await mailer.sendMail({
+    from: "BoligEffekt <onboarding@resend.dev>",
     to: epost,
     subject: `Din energirapport – Merke ${merke.merke} (${kwhPerM2} kWh/m²/år)`,
     html: `
