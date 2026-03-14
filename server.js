@@ -270,7 +270,8 @@ app.post("/api/send-rapport", async (req, res) => {
 
     res.json({ ok: true, epost: kundeEpost });
   } catch (err) {
-    console.error("Rapport-feil:", err.message);
+    console.error("Rapport-feil:", err.message, err.stack);
+console.error("Full feil:", JSON.stringify(err));
     res.status(500).json({ feil: err.message });
   }
 });
