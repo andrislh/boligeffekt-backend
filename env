@@ -1,0 +1,31 @@
+# ─────────────────────────────────────────────
+# BoligEffekt – Miljøvariabler
+# Kopier denne filen til .env og fyll inn verdiene
+# ALDRI del .env-filen eller legg den på GitHub!
+# ─────────────────────────────────────────────
+
+# ── STRIPE ───────────────────────────────────
+# Finn på: dashboard.stripe.com/apikeys
+# Bruk sk_test_ under utvikling, sk_live_ i produksjon
+STRIPE_SECRET_KEY=sk_test_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+# Webhook-hemmelighet (valgfritt, men anbefalt)
+# Finn på: dashboard.stripe.com/webhooks
+STRIPE_WEBHOOK_SECRET=whsec_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+# ── E-POST (Gmail) ────────────────────────────
+# Bruk et eget Gmail-domene, f.eks. rapport@boligeffekt.no
+# VIKTIG: Bruk "App-passord", ikke vanlig passord!
+# Sett opp på: myaccount.google.com/apppasswords
+EMAIL_USER=rapport@boligeffekt.no
+EMAIL_PASS=xxxx xxxx xxxx xxxx
+
+# ── URLS ──────────────────────────────────────
+# URL til React-appen (uten skråstrek på slutten)
+# Under utvikling:
+# FRONTEND_URL=http://localhost:3000
+# I produksjon:
+FRONTEND_URL=https://boligeffekt.no
+
+# ── SERVER ────────────────────────────────────
+PORT=4000
