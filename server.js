@@ -193,12 +193,108 @@ async function sendEpost(epost, pdfBytes, data) {
   });
 }
 
+// ── Send e-post for Oppgraderingsplan ────────────────────────
+async function sendEpostOppgradering(epost, pdfBytes, data) {
+  const { merke, kwhPerM2, tiltak, bygData, merkePotensial, totalKwh } = data.resultat;
+  const høy         = tiltak.filter(t => t.prioritet === "høy");
+  const totInv      = høy.reduce((s, t) => s + t.kostnad_snitt, 0);
+  const totStøtte   = høy.reduce((s, t) => s + t.støtte_snitt, 0);
+  const netto       = totInv - totStøtte;
+  const totBes      = høy.reduce((s, t) => s + t.besparelse_kr, 0);
+  const breakEven   = totBes > 0 ? Math.round(netto / totBes) : "–";
+  const bestTiltak  = høy[0];
+  const top3        = høy.slice(0, 3);
+  const søknadstekst = `Jeg søker om støtte til energitiltak i min bolig. Boligen ble bygget i perioden ${bygData.label} og har i dag estimert energimerke ${merke.merke}. Tiltakene jeg planlegger å gjennomføre er: ${høy.map(t=>t.navn).join(", ")}. Forventet energibesparelse er ca. ${høy.reduce((s,t)=>s+Math.round(totalKwh*t.kWh_pct),0).toLocaleString("no")} kWh per år, noe som tilsvarer ca. ${totBes.toLocaleString("no")} kroner i reduserte strømutgifter. Tiltakene vil forbedre boligens energimerke fra ${merke.merke} til estimert ${merkePotensial.merke}.`;
+
+  await resend.emails.send({
+    from: "BoligEffekt <onboarding@resend.dev>",
+    to: epost,
+    subject: `Din Oppgraderingsplan – Merke ${merke.merke} → ${merkePotensial.merke} (${kwhPerM2} kWh/m²/år)`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f0ede8;padding:0 0 32px">
+        <div style="background:#1b3a5c;padding:28px 32px">
+          <h1 style="color:white;margin:0;font-size:22px">BoligEffekt</h1>
+          <p style="color:rgba(255,255,255,0.6);margin:4px 0 0;font-size:13px">Din Oppgraderingsplan er klar</p>
+        </div>
+        <div style="padding:32px">
+          <p style="color:#0f2540;font-size:15px;margin-bottom:24px">Hei,<br><br>Takk for kjøpet av Oppgraderingsplan! Her er din komplette energianalyse med handlingsplan.</p>
+
+          <!-- Energimerke -->
+          <div style="background:white;border-radius:12px;padding:20px;margin-bottom:16px;border:1px solid rgba(27,58,92,0.1)">
+            <h2 style="color:#1b3a5c;margin:0 0 12px;font-size:16px">&#9889; Energistatus</h2>
+            <table style="width:100%;border-collapse:collapse">
+              <tr><td style="padding:7px 0;color:#6b7a8d;font-size:13px">Nåværende merke</td><td style="padding:7px 0;font-weight:bold;color:#0f2540;text-align:right">Merke ${merke.merke} – ${kwhPerM2} kWh/m²/år</td></tr>
+              <tr style="border-top:1px solid #f0ede8"><td style="padding:7px 0;color:#6b7a8d;font-size:13px">Potensielt merke</td><td style="padding:7px 0;font-weight:bold;color:#2ab55a;text-align:right">Merke ${merkePotensial.merke} med anbefalte tiltak</td></tr>
+            </table>
+          </div>
+
+          <!-- Økonomianalyse -->
+          <div style="background:white;border-radius:12px;padding:20px;margin-bottom:16px;border:1px solid rgba(27,58,92,0.1)">
+            <h2 style="color:#1b3a5c;margin:0 0 12px;font-size:16px">&#128200; Økonomianalyse</h2>
+            <table style="width:100%;border-collapse:collapse">
+              ${[
+                ["Total investering",         `${Math.round(totInv/1000)} 000 kr`],
+                ["Total Enova-støtte",         `${Math.round(totStøtte/1000)} 000 kr`],
+                ["Netto kostnad etter støtte", `${Math.round(netto/1000)} 000 kr`],
+                ["Estimert årsbesparelse",    `${totBes.toLocaleString("no")} kr`],
+                ["Besparelse over 10 år",     `${(totBes*10).toLocaleString("no")} kr`],
+                ["Break-even",                `${breakEven} år`],
+              ].map(([k,v]) => `<tr style="border-top:1px solid #f0ede8"><td style="padding:7px 0;color:#6b7a8d;font-size:13px">${k}</td><td style="padding:7px 0;font-weight:bold;color:#0f2540;text-align:right">${v}</td></tr>`).join("")}
+            </table>
+          </div>
+
+          <!-- Beste investering -->
+          ${bestTiltak ? `
+          <div style="background:#1b3a5c;border-radius:12px;padding:18px;margin-bottom:16px">
+            <p style="color:#3ecf6e;font-size:11px;font-weight:800;letter-spacing:0.08em;margin:0 0 6px;text-transform:uppercase">Beste investering nå</p>
+            <p style="color:white;font-weight:bold;font-size:15px;margin:0 0 6px">${bestTiltak.navn}</p>
+            <p style="color:rgba(255,255,255,0.65);font-size:12px;margin:0">${bestTiltak.tilbakebetaling <= 30 ? bestTiltak.tilbakebetaling + " års tilbakebetaling" : "Lang sikt"} · Enova inntil ${(bestTiltak.støtte_max/1000).toFixed(0)}k kr · ~${bestTiltak.besparelse_kr.toLocaleString("no")} kr/år besparelse</p>
+          </div>` : ""}
+
+          <!-- Topp tiltak med Enova-lenker -->
+          <div style="background:white;border-radius:12px;padding:20px;margin-bottom:16px;border:1px solid rgba(27,58,92,0.1)">
+            <h2 style="color:#1b3a5c;margin:0 0 12px;font-size:16px">&#128203; Topp tiltak med Enova-søknad</h2>
+            ${top3.map(t => `
+              <div style="border-top:1px solid #f0ede8;padding:10px 0">
+                <p style="margin:0 0 3px;font-weight:700;color:#0f2540;font-size:13px">${t.navn}</p>
+                <p style="margin:0 0 6px;color:#6b7a8d;font-size:12px">Støtte inntil ${(t.støtte_max/1000).toFixed(0)}k kr · ~${t.besparelse_kr.toLocaleString("no")} kr/år</p>
+                <a href="https://www.enova.no/privat/alle-energitiltak/" style="color:#1b3a5c;font-size:12px;font-weight:700">Søk Enova-støtte →</a>
+              </div>`).join("")}
+          </div>
+
+          <!-- Søknadstekst -->
+          <div style="background:#f7f5f2;border-radius:12px;padding:18px;margin-bottom:16px;border:1px solid rgba(27,58,92,0.08)">
+            <h2 style="color:#1b3a5c;margin:0 0 10px;font-size:15px">&#9999;&#65039; Ferdig søknadstekst for Enova</h2>
+            <p style="color:#6b7a8d;font-size:12px;margin:0 0 10px;font-style:italic">${søknadstekst}</p>
+            <p style="color:#6b7a8d;font-size:11px;margin:0">Kopier teksten og lim inn i Enova-søknaden din på enova.no</p>
+          </div>
+
+          <p style="color:#6b7a8d;font-size:13px;line-height:1.6">Full rapport er vedlagt som PDF.<br>Spørsmål? Svar på denne e-posten.</p>
+        </div>
+        <div style="padding:0 32px;border-top:1px solid rgba(27,58,92,0.1)">
+          <p style="color:#bbb;font-size:11px;line-height:1.6;margin-top:20px">BoligEffekt · Estimat basert på NS-EN ISO 52000 og TEK-historikk.<br>For offisielt energimerke kreves godkjent energirådgiver.</p>
+        </div>
+      </div>
+    `,
+    attachments: [{
+      filename: `BoligEffekt-oppgraderingsplan-merke-${merke.merke}.pdf`,
+      content: Buffer.from(pdfBytes).toString("base64"),
+    }],
+  });
+}
+
 // ── API-endepunkter ───────────────────────────────────────────
 
 // 1. Opprett Stripe betalingsøkt
 app.post("/api/create-checkout", async (req, res) => {
   try {
-    const { resultatId, email, resultatData } = req.body;
+    const { resultatId, email, resultatData, pakke } = req.body;
+
+    const PAKKER = {
+      energirapport:     { navn: "BoligEffekt – Energirapport",     beskrivelse: "Energimerke, tiltaksplan, Enova-støtteoversikt, EPBD-status og PDF-rapport", beløp: 19900 },
+      oppgraderingsplan: { navn: "BoligEffekt – Oppgraderingsplan", beskrivelse: "Alt i Energirapport + økonomianalyse, handlingsplan, Enova-søknadspakke, søknadstekst og finansieringstips", beløp: 39900 },
+    };
+    const valgtPakke = PAKKER[pakke] || PAKKER.energirapport;
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
@@ -206,10 +302,10 @@ app.post("/api/create-checkout", async (req, res) => {
         price_data: {
           currency: "nok",
           product_data: {
-            name: "BoligEffekt – Full energirapport",
-            description: "Komplett tiltaksplan, Enova-støtteoversikt, EPBD-status og PDF-rapport",
+            name: valgtPakke.navn,
+            description: valgtPakke.beskrivelse,
           },
-          unit_amount: 19900,
+          unit_amount: valgtPakke.beløp,
         },
         quantity: 1,
       }],
@@ -219,7 +315,7 @@ app.post("/api/create-checkout", async (req, res) => {
       cancel_url: `${process.env.FRONTEND_URL}?avbrutt=true`,
       metadata: {
         resultatId,
-        // Lagrer data i metadata (maks 500 tegn per felt)
+        pakke: pakke || "energirapport",
         resultat_json: JSON.stringify(resultatData).slice(0, 490),
       },
       locale: "nb",
@@ -251,7 +347,7 @@ app.get("/api/verifiser-betaling", async (req, res) => {
 // 3. Generer og send PDF (kalles fra frontend etter betaling bekreftet)
 app.post("/api/send-rapport", async (req, res) => {
   try {
-    const { session_id, resultatData, epost } = req.body;
+    const { session_id, resultatData, epost, pakke } = req.body;
 
     // Verifiser at betaling faktisk er gjort
     const session = await stripe.checkout.sessions.retrieve(session_id);
@@ -260,17 +356,22 @@ app.post("/api/send-rapport", async (req, res) => {
     }
 
     const kundeEpost = epost || session.customer_email;
+    const valgtPakke = pakke || session.metadata?.pakke || "energirapport";
 
     // Generer PDF
     const pdfBytes = await lagPDF(resultatData);
 
-    // Send e-post
-    await sendEpost(kundeEpost, pdfBytes, resultatData);
+    // Send e-post (pakke-spesifikt innhold)
+    if (valgtPakke === "oppgraderingsplan") {
+      await sendEpostOppgradering(kundeEpost, pdfBytes, resultatData);
+    } else {
+      await sendEpost(kundeEpost, pdfBytes, resultatData);
+    }
 
     res.json({ ok: true, epost: kundeEpost });
   } catch (err) {
     console.error("Rapport-feil:", err.message, err.stack);
-console.error("Full feil:", JSON.stringify(err));
+    console.error("Full feil:", JSON.stringify(err));
     res.status(500).json({ feil: err.message });
   }
 });
