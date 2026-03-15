@@ -12,12 +12,16 @@ console.log("=== BoligEffekt backend starter ===");
 console.log("RESEND_API_KEY:", process.env.RESEND_API_KEY
   ? `${process.env.RESEND_API_KEY.slice(0, 8)}... (OK)`
   : "MANGLER – e-post vil feile!");
+console.log("RESEND_FROM_EMAIL:", process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev (standard test-avsender)");
 console.log("STRIPE_SECRET_KEY:", process.env.STRIPE_SECRET_KEY ? "OK" : "MANGLER!");
 console.log("FRONTEND_URL:", process.env.FRONTEND_URL || "(ikke satt)");
 console.log("NODE_ENV:", process.env.NODE_ENV || "development");
 
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const resend = new Resend(process.env.RESEND_API_KEY);
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL
+  ? `BoligEffekt <${process.env.RESEND_FROM_EMAIL}>`
+  : "BoligEffekt <onboarding@resend.dev>";
 
 const app = express();
 app.use(cors({ origin: "*" }));
@@ -231,7 +235,7 @@ async function lagPDF(data, pakke) {
     y2 -= 16;
 
     if (bestTiltak) {
-      side2.drawRectangle({ x: 40, y: y2 - 54, width: width - 80, height: 58, color: rgb(0.165, 0.71, 0.353, 0.1), borderRadius: 6 });
+      side2.drawRectangle({ x: 40, y: y2 - 54, width: width - 80, height: 58, color: rgb(0.90, 0.97, 0.92), borderRadius: 6 });
       side2.drawRectangle({ x: 40, y: y2 - 54, width: 4,          height: 58, color: green });
       side2.drawText("BESTE INVESTERING NA:", { x: 52, y: y2 - 10, size: 8, font: fontBold, color: green });
       side2.drawText(safePDF(bestTiltak.navn), { x: 52, y: y2 - 24, size: 11, font: fontBold, color: navy });
@@ -355,7 +359,7 @@ async function sendEpost(epostAdresse, pdfBytes, data) {
   const totalStøtte = tiltak.filter(t => t.prioritet === "høy").reduce((s, t) => s + t.støtte_snitt, 0);
 
   const result = await resend.emails.send({
-    from: "BoligEffekt <onboarding@resend.dev>",
+    from: FROM_EMAIL,
     to: epostAdresse,
     subject: `Din energirapport – Merke ${merke.merke} (${kwhPerM2} kWh/m²/år)`,
     html: `
@@ -407,7 +411,7 @@ async function sendEpostOppgradering(epostAdresse, pdfBytes, data) {
   const søknadstekst = `Jeg søker om støtte til energitiltak i min bolig. Boligen ble bygget i perioden ${bygData.label} og har i dag estimert energimerke ${merke.merke}. Tiltakene jeg planlegger å gjennomføre er: ${høy.map(t => t.navn).join(", ")}. Forventet energibesparelse er ca. ${kwhSpart.toLocaleString("no")} kWh per år, noe som tilsvarer ca. ${totBes.toLocaleString("no")} kroner i reduserte strømutgifter. Tiltakene vil forbedre boligens energimerke fra ${merke.merke} til estimert ${merkePotensial ? merkePotensial.merke : "B"}.`;
 
   const result = await resend.emails.send({
-    from: "BoligEffekt <onboarding@resend.dev>",
+    from: FROM_EMAIL,
     to: epostAdresse,
     subject: `Din Oppgraderingsplan – Merke ${merke.merke} → ${merkePotensial ? merkePotensial.merke : "B"} (${kwhPerM2} kWh/m²/år)`,
     html: `
@@ -605,7 +609,7 @@ app.post("/api/lead", async (req, res) => {
 
   try {
     await resend.emails.send({
-      from: "BoligEffekt <onboarding@resend.dev>",
+      from: FROM_EMAIL,
       to: "andrislhelle@gmail.com",
       subject: `Ny lead: ${navn} – Merke ${merke}`,
       html: `
