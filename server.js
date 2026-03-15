@@ -293,7 +293,47 @@ app.post("/webhook", async (req, res) => {
   res.json({ mottatt: true });
 });
 
-// 5. Helsesjekk
+// 5. Lead-registrering
+app.post("/api/lead", async (req, res) => {
+  const { navn, telefon, epost, merke, tiltak } = req.body;
+  console.log("NY LEAD:", { navn, telefon, epost, merke, tiltak });
+
+  try {
+    await resend.emails.send({
+      from: "BoligEffekt <onboarding@resend.dev>",
+      to: "andrislhelle@gmail.com",
+      subject: `Ny lead: ${navn} – Merke ${merke}`,
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#f0ede8;padding:0 0 28px">
+          <div style="background:#1b3a5c;padding:22px 28px">
+            <h2 style="color:white;margin:0;font-size:18px">BoligEffekt – Ny lead</h2>
+          </div>
+          <div style="padding:24px 28px">
+            <table style="width:100%;border-collapse:collapse;background:white;border-radius:10px;overflow:hidden">
+              ${[
+                ["Navn",    navn],
+                ["Telefon", telefon],
+                ["E-post",  epost || "–"],
+                ["Energimerke", `Merke ${merke}`],
+                ["Topp tiltak", (tiltak||[]).join(", ") || "–"],
+              ].map(([k,v]) => `
+                <tr>
+                  <td style="padding:11px 16px;color:#6b7a8d;font-size:13px;border-bottom:1px solid #f0ede8;width:38%">${k}</td>
+                  <td style="padding:11px 16px;font-weight:700;color:#0f2540;font-size:13px;border-bottom:1px solid #f0ede8">${v}</td>
+                </tr>`).join("")}
+            </table>
+          </div>
+        </div>
+      `,
+    });
+  } catch (err) {
+    console.error("Lead e-post feil:", err.message);
+  }
+
+  res.json({ ok: true });
+});
+
+// 6. Helsesjekk
 app.get("/", (req, res) => res.json({ status: "BoligEffekt backend kjører" }));
 
 const PORT = process.env.PORT || 4000;
