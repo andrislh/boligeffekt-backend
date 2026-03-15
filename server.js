@@ -137,7 +137,7 @@ async function sendEpost(epost, pdfBytes, data) {
     .filter(t => t.prioritet === "høy")
     .reduce((s, t) => s + t.støtte_snitt, 0);
 
-  await await mailer.sendMail({
+  await resend.emails.send({
     from: "BoligEffekt <onboarding@resend.dev>",
     to: epost,
     subject: `Din energirapport – Merke ${merke.merke} (${kwhPerM2} kWh/m²/år)`,
@@ -151,7 +151,7 @@ async function sendEpost(epost, pdfBytes, data) {
           <p style="color:#0f2540;font-size:16px;margin-bottom:24px">Hei,<br><br>Takk for kjøpet! Her er din komplette energirapport.</p>
 
           <div style="background:white;border-radius:12px;padding:24px;margin-bottom:20px;border:1px solid rgba(27,58,92,0.1)">
-            <h2 style="color:#1b3a5c;margin:0 0 16px;font-size:18px">📊 Ditt resultat</h2>
+            <h2 style="color:#1b3a5c;margin:0 0 16px;font-size:18px">&#128202; Ditt resultat</h2>
             <table style="width:100%;border-collapse:collapse">
               <tr>
                 <td style="padding:8px 0;color:#6b7a8d;font-size:14px">Energimerke</td>
@@ -188,8 +188,7 @@ async function sendEpost(epost, pdfBytes, data) {
     `,
     attachments: [{
       filename: `BoligEffekt-rapport-merke-${merke.merke}.pdf`,
-      content: Buffer.from(pdfBytes),
-      contentType: "application/pdf",
+      content: Buffer.from(pdfBytes).toString("base64"),
     }],
   });
 }
