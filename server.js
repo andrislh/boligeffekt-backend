@@ -638,10 +638,87 @@ app.post("/api/lead", async (req, res) => {
 });
 
 // 6. Helsesjekk
-app.get("/", (req, res) => res.json({ status: "BoligEffekt backend kjører", resend: !!process.env.RESEND_API_KEY, stripe: !!process.env.STRIPE_SECRET_KEY }));
+app.get("/", (req, res) => res.json({ status: "BoligEffekt backend kjører", resend: !!process.env.RESEND_API_KEY, stripe: !!process.env.STRIPE_SECRET_KEY, claude: !!process.env.CLAUDE_API_KEY }));
+
+// ── Claude API via fetch (ingen SDK) ──────────────────────────
+async function callClaude({ system, messages, max_tokens = 600 }) {
+  const body = { model: "claude-sonnet-4-20250514", max_tokens, messages };
+  if (system) body.system = system;
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": process.env.CLAUDE_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Claude API ${res.status}: ${err}`);
+  }
+  return res.json();
+}
+
+// 7. Chat
+app.post("/api/chat", async (req, res) => {
+  const { melding, historikk = [] } = req.body;
+  if (!melding) return res.status(400).json({ feil: "Mangler melding" });
+  console.log("[CHAT] Melding:", melding.slice(0, 80));
+  try {
+    const messages = [
+      ...historikk.map(h => ({ role: h.rolle === "user" ? "user" : "assistant", content: h.innhold })),
+      { role: "user", content: melding },
+    ];
+    const response = await callClaude({
+      system: "Du er en hjelpsom energirådgiver for BoligEffekt. Du hjelper norske boligeiere med generelle spørsmål om energimerking (A-G skala), Enova-støtte, TEK17, EPBD 2024 og energioppgradering av boliger. Svar alltid på norsk. Vær konkret og hjelpsom. VIKTIG: Du skal IKKE gi spesifikke beregninger, tiltaksplaner, prioriteringer, Enova-søknadsveiledning eller detaljerte anbefalinger for enkeltboliger - dette er premiuminnhold som kun er tilgjengelig i en BoligEffekt-rapport. Hvis noen ber om slike detaljer, svar at dette får de i en rapport fra BoligEffekt. Du kan snakke generelt om temaene, men ikke erstatte rapporten.",
+      messages,
+    });
+    const svar = response.content[0]?.text || "Beklager, prøv igjen.";
+    console.log("[CHAT] Svar lengde:", svar.length);
+    res.json({ svar });
+  } catch (err) {
+    console.error("[CHAT] Feil:", err.message);
+    res.status(500).json({ feil: "Kunne ikke hente svar akkurat nå." });
+  }
+});
+
+// 8. Nyheter (cachet 24 timer)
+let nyheterCache = { data: null, ts: 0 };
+const NYHETER_TTL = 24 * 60 * 60 * 1000;
+
+app.get("/api/nyheter", async (req, res) => {
+  const nå = Date.now();
+  if (nyheterCache.data && (nå - nyheterCache.ts < NYHETER_TTL)) {
+    console.log("[NYHETER] Returnerer fra cache");
+    return res.json({ nyheter: nyheterCache.data, fra_cache: true });
+  }
+  console.log("[NYHETER] Henter ferske nyheter fra Claude...");
+  try {
+    const response = await callClaude({
+      max_tokens: 1200,
+      messages: [{
+        role: "user",
+        content: `Generer 5 relevante og realistiske nyhetsoverskrifter med sammendrag om norsk energimerking, Enova-støtte, EPBD-direktivet, TEK17 og boligoppgradering i Norge. Bruk dagens dato (${new Date().toLocaleDateString("nb-NO")}) og gjeldende regelverk. Svar KUN med JSON-array uten annen tekst:\n[{"tittel":"...","sammendrag":"...","dato":"DD.MM.ÅÅÅÅ","kilde":"Enova.no"},...]`
+      }],
+    });
+    const tekst = response.content[0]?.text || "[]";
+    const match = tekst.match(/\[[\s\S]*\]/);
+    if (!match) throw new Error("Ingen JSON i svar");
+    const nyheter = JSON.parse(match[0]);
+    nyheterCache = { data: nyheter, ts: nå };
+    console.log("[NYHETER] Hentet", nyheter.length, "nyheter");
+    res.json({ nyheter, fra_cache: false });
+  } catch (err) {
+    console.error("[NYHETER] Feil:", err.message);
+    if (nyheterCache.data) return res.json({ nyheter: nyheterCache.data, fra_cache: true });
+    res.status(500).json({ feil: "Kunne ikke hente nyheter akkurat nå" });
+  }
+});
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`✅ BoligEffekt backend kjører på port ${PORT}`);
+  console.log(`   CLAUDE_API_KEY: ${process.env.CLAUDE_API_KEY ? "OK" : "MANGLER"}`);
   console.log(`   Frontend URL: ${process.env.FRONTEND_URL}`);
 });
