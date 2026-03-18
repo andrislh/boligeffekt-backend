@@ -6,7 +6,7 @@ const express  = require("express");
 const cors     = require("cors");
 const { Resend } = require("resend");
 const { PDFDocument, rgb, StandardFonts } = require("pdf-lib");
-const Anthropic = require("@anthropic-ai/sdk");
+// Bruker native fetch (Node 18+) istedenfor @anthropic-ai/sdk for å unngå native deps på Railway
 
 // ── Startup-sjekk ─────────────────────────────────────────────
 console.log("=== BoligEffekt backend starter ===");
@@ -23,7 +23,26 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const resend = new Resend(process.env.RESEND_API_KEY);
 // onboarding@resend.dev er eneste avsender som fungerer uten domene-verifisering i Resend test-modus
 const FROM_EMAIL = "onboarding@resend.dev";
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// Hjelpefunksjon: kall Anthropic Messages API via native fetch (ingen SDK nødvendig)
+async function callClaude({ system, messages, model = "claude-sonnet-4-20250514", max_tokens = 1024 }) {
+  const body = { model, max_tokens, messages };
+  if (system) body.system = system;
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Anthropic API ${res.status}: ${err}`);
+  }
+  return res.json();
+}
 
 const app = express();
 app.use(cors({ origin: "*" }));
@@ -655,8 +674,7 @@ app.post("/api/chat", async (req, res) => {
       { role: "user", content: melding },
     ];
 
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+    const response = await callClaude({
       max_tokens: 600,
       system: "Du er en hjelpsom energirådgiver for BoligEffekt. Du hjelper norske boligeiere med spørsmål om energimerking (A-G skala), Enova-støtte, TEK17, EPBD 2024-direktivet og energioppgradering av boliger. Svar alltid på norsk. Vær konkret og hjelpsom. Hvis noen spør om priser på håndverkere eller spesifikke tekniske beregninger, anbefal dem å kjøpe en rapport fra BoligEffekt for nøyaktig analyse av deres bolig.",
       messages,
@@ -677,8 +695,7 @@ const NYHETER_TTL = 24 * 60 * 60 * 1000; // 24 timer
 
 async function hentNyheterFraAI() {
   console.log("[NYHETER] Henter ferske nyheter fra Claude...");
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
+  const response = await callClaude({
     max_tokens: 1200,
     messages: [{
       role: "user",
