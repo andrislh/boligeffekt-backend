@@ -19,9 +19,8 @@ console.log("NODE_ENV:", process.env.NODE_ENV || "development");
 
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL
-  ? `BoligEffekt <${process.env.RESEND_FROM_EMAIL}>`
-  : "BoligEffekt <onboarding@resend.dev>";
+// onboarding@resend.dev er eneste avsender som fungerer uten domene-verifisering i Resend test-modus
+const FROM_EMAIL = "onboarding@resend.dev";
 
 const app = express();
 app.use(cors({ origin: "*" }));
@@ -355,13 +354,14 @@ async function lagPDF(data, pakke) {
 // ── Send e-post: Energirapport ────────────────────────────────
 async function sendEpost(epostAdresse, pdfBytes, data) {
   console.log("[E-POST] Sender Energirapport til:", epostAdresse);
+  console.log("[E-POST] Fra:", FROM_EMAIL);
   const { merke, kwhPerM2, tiltak } = data.resultat;
   const totalStøtte = tiltak.filter(t => t.prioritet === "høy").reduce((s, t) => s + t.støtte_snitt, 0);
 
   const result = await resend.emails.send({
     from: FROM_EMAIL,
     to: epostAdresse,
-    subject: `Din energirapport – Merke ${merke.merke} (${kwhPerM2} kWh/m²/år)`,
+    subject: `Din energirapport - Merke ${merke.merke} (${kwhPerM2} kWh/m2/ar)`,
     html: `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f0ede8;padding:0 0 32px">
         <div style="background:#1b3a5c;padding:28px 32px">
@@ -392,12 +392,16 @@ async function sendEpost(epostAdresse, pdfBytes, data) {
   });
 
   console.log("[E-POST] Resend respons (Energirapport):", JSON.stringify(result));
+  if (result.error) {
+    throw new Error(`Resend feil: ${result.error.message || JSON.stringify(result.error)}`);
+  }
   return result;
 }
 
 // ── Send e-post: Oppgraderingsplan ────────────────────────────
 async function sendEpostOppgradering(epostAdresse, pdfBytes, data) {
   console.log("[E-POST] Sender Oppgraderingsplan til:", epostAdresse);
+  console.log("[E-POST] Fra:", FROM_EMAIL);
   const { merke, kwhPerM2, tiltak, bygData, merkePotensial, totalKwh } = data.resultat;
   const høy       = tiltak.filter(t => t.prioritet === "høy");
   const totInv    = høy.reduce((s, t) => s + t.kostnad_snitt, 0);
@@ -413,7 +417,7 @@ async function sendEpostOppgradering(epostAdresse, pdfBytes, data) {
   const result = await resend.emails.send({
     from: FROM_EMAIL,
     to: epostAdresse,
-    subject: `Din Oppgraderingsplan – Merke ${merke.merke} → ${merkePotensial ? merkePotensial.merke : "B"} (${kwhPerM2} kWh/m²/år)`,
+    subject: `Din Oppgraderingsplan - Merke ${merke.merke} til ${merkePotensial ? merkePotensial.merke : "B"} (${kwhPerM2} kWh/m2/ar)`,
     html: `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f0ede8;padding:0 0 32px">
         <div style="background:#1b3a5c;padding:28px 32px">
@@ -485,6 +489,9 @@ async function sendEpostOppgradering(epostAdresse, pdfBytes, data) {
   });
 
   console.log("[E-POST] Resend respons (Oppgraderingsplan):", JSON.stringify(result));
+  if (result.error) {
+    throw new Error(`Resend feil: ${result.error.message || JSON.stringify(result.error)}`);
+  }
   return result;
 }
 
