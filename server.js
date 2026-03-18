@@ -1,12 +1,11 @@
 // BoligEffekt – Backend
-// Håndterer: Stripe-betaling, PDF-generering, e-postsending, AI-chat, nyheter
+// Håndterer: Stripe-betaling, PDF-generering, e-postsending
 
 require("dotenv").config();
 const express  = require("express");
 const cors     = require("cors");
 const { Resend } = require("resend");
 const { PDFDocument, rgb, StandardFonts } = require("pdf-lib");
-// Bruker native fetch (Node 18+) istedenfor @anthropic-ai/sdk for å unngå native deps på Railway
 
 // ── Startup-sjekk ─────────────────────────────────────────────
 console.log("=== BoligEffekt backend starter ===");
@@ -15,7 +14,6 @@ console.log("RESEND_API_KEY:", process.env.RESEND_API_KEY
   : "MANGLER – e-post vil feile!");
 console.log("RESEND_FROM_EMAIL:", process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev (standard test-avsender)");
 console.log("STRIPE_SECRET_KEY:", process.env.STRIPE_SECRET_KEY ? "OK" : "MANGLER!");
-console.log("ANTHROPIC_API_KEY:", process.env.ANTHROPIC_API_KEY ? "OK" : "MANGLER – chat og nyheter vil feile!");
 console.log("FRONTEND_URL:", process.env.FRONTEND_URL || "(ikke satt)");
 console.log("NODE_ENV:", process.env.NODE_ENV || "development");
 
@@ -23,26 +21,6 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const resend = new Resend(process.env.RESEND_API_KEY);
 // onboarding@resend.dev er eneste avsender som fungerer uten domene-verifisering i Resend test-modus
 const FROM_EMAIL = "onboarding@resend.dev";
-
-// Hjelpefunksjon: kall Anthropic Messages API via native fetch (ingen SDK nødvendig)
-async function callClaude({ system, messages, model = "claude-sonnet-4-20250514", max_tokens = 1024 }) {
-  const body = { model, max_tokens, messages };
-  if (system) body.system = system;
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": process.env.ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Anthropic API ${res.status}: ${err}`);
-  }
-  return res.json();
-}
 
 const app = express();
 app.use(cors({ origin: "*" }));
@@ -660,98 +638,7 @@ app.post("/api/lead", async (req, res) => {
 });
 
 // 6. Helsesjekk
-app.get("/", (req, res) => res.json({ status: "BoligEffekt backend kjører", resend: !!process.env.RESEND_API_KEY, stripe: !!process.env.STRIPE_SECRET_KEY, anthropic: !!process.env.ANTHROPIC_API_KEY }));
-
-// 7. AI-chat
-app.post("/api/chat", async (req, res) => {
-  const { melding, historikk = [] } = req.body;
-  console.log("[CHAT] Ny melding:", melding?.slice(0, 80));
-  if (!melding) return res.status(400).json({ feil: "Mangler melding" });
-
-  try {
-    const messages = [
-      ...historikk.map(h => ({ role: h.rolle === "user" ? "user" : "assistant", content: h.innhold })),
-      { role: "user", content: melding },
-    ];
-
-    const response = await callClaude({
-      max_tokens: 600,
-      system: "Du er en hjelpsom energirådgiver for BoligEffekt. Du hjelper norske boligeiere med spørsmål om energimerking (A-G skala), Enova-støtte, TEK17, EPBD 2024-direktivet og energioppgradering av boliger. Svar alltid på norsk. Vær konkret og hjelpsom. Hvis noen spør om priser på håndverkere eller spesifikke tekniske beregninger, anbefal dem å kjøpe en rapport fra BoligEffekt for nøyaktig analyse av deres bolig.",
-      messages,
-    });
-
-    const svar = response.content[0]?.text || "Beklager, kunne ikke svare akkurat nå.";
-    console.log("[CHAT] Svar generert, lengde:", svar.length);
-    res.json({ svar });
-  } catch (err) {
-    console.error("[CHAT] Feil:", err.message);
-    res.status(500).json({ feil: "Kunne ikke hente svar akkurat nå." });
-  }
-});
-
-// 8. Nyheter (AI-generert, cachet 24 timer)
-let nyheterCache = { data: null, ts: 0 };
-const NYHETER_TTL = 24 * 60 * 60 * 1000; // 24 timer
-
-async function hentNyheterFraAI() {
-  console.log("[NYHETER] Henter ferske nyheter fra Claude...");
-  const response = await callClaude({
-    max_tokens: 1200,
-    messages: [{
-      role: "user",
-      content: `Generer 5 relevante og realistiske nyhetsoverskrifter med sammendrag om norsk energimerking, Enova-støtte, EPBD-direktivet, TEK17 og boligoppgradering i Norge. Bruk dagens dato (${new Date().toLocaleDateString("nb-NO")}) og gjeldende regelverk. Svar KUN med JSON-array i dette formatet (ingen annen tekst):
-[
-  {"tittel":"...", "sammendrag":"...", "dato":"DD.MM.ÅÅÅÅ", "kilde":"Enova.no"},
-  ...
-]
-Kildene skal variere mellom: Enova.no, Husbanken.no, Regjeringen.no, NVE.no, DIBK.no`
-    }],
-  });
-
-  const tekst = response.content[0]?.text || "[]";
-  // Finn JSON-array i svaret
-  const match = tekst.match(/\[[\s\S]*\]/);
-  if (!match) throw new Error("Ingen JSON-array i AI-svar");
-  return JSON.parse(match[0]);
-}
-
-async function oppdaterNyheterCache() {
-  try {
-    const nyheter = await hentNyheterFraAI();
-    nyheterCache = { data: nyheter, ts: Date.now() };
-    console.log("[NYHETER] Cache oppdatert med", nyheter.length, "nyheter");
-  } catch (err) {
-    console.error("[NYHETER] Kunne ikke oppdatere cache:", err.message);
-  }
-}
-
-app.post("/api/nyheter", async (req, res) => {
-  const { tving } = req.body || {};
-  console.log("[NYHETER] Forespørsel mottatt, tvunget refresh:", !!tving);
-
-  const nå = Date.now();
-  const cacheGyldig = nyheterCache.data && (nå - nyheterCache.ts < NYHETER_TTL) && !tving;
-
-  if (cacheGyldig) {
-    console.log("[NYHETER] Returnerer fra cache");
-    return res.json({ nyheter: nyheterCache.data, fra_cache: true });
-  }
-
-  try {
-    const nyheter = await hentNyheterFraAI();
-    nyheterCache = { data: nyheter, ts: nå };
-    res.json({ nyheter, fra_cache: false });
-  } catch (err) {
-    console.error("[NYHETER] Feil:", err.message);
-    if (nyheterCache.data) {
-      return res.json({ nyheter: nyheterCache.data, fra_cache: true, advarsel: "Bruker gammel cache" });
-    }
-    res.status(500).json({ feil: "Kunne ikke hente nyheter akkurat nå" });
-  }
-});
-
-// Auto-refresh nyheter hvert 24. time
-setInterval(oppdaterNyheterCache, NYHETER_TTL);
+app.get("/", (req, res) => res.json({ status: "BoligEffekt backend kjører", resend: !!process.env.RESEND_API_KEY, stripe: !!process.env.STRIPE_SECRET_KEY }));
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
