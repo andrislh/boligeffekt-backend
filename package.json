@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "node server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -15,9 +15,6 @@
     "pdf-lib": "^1.17.1",
     "resend": "^6.9.3",
     "stripe": "^14.10.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.2"
   },
   "engines": {
     "node": ">=18.0.0"
