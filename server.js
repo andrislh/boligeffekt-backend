@@ -638,7 +638,7 @@ app.post("/api/lead", async (req, res) => {
 });
 
 // 6. Helsesjekk
-app.get("/", (req, res) => res.json({ status: "BoligEffekt backend kjører", resend: !!process.env.RESEND_API_KEY, stripe: !!process.env.STRIPE_SECRET_KEY, claude: !!process.env.CLAUDE_API_KEY }));
+app.get("/", (req, res) => res.json({ status: "BoligEffekt backend kjører", resend: !!process.env.RESEND_API_KEY, stripe: !!process.env.STRIPE_SECRET_KEY, claude: !!process.env.CLAUDE_TOKEN }));
 
 // ── Claude API via fetch (ingen SDK) ──────────────────────────
 async function callClaude({ system, messages, max_tokens = 600 }) {
@@ -647,7 +647,7 @@ async function callClaude({ system, messages, max_tokens = 600 }) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
-      "x-api-key": process.env.CLAUDE_API_KEY,
+      "x-api-key": process.env.CLAUDE_TOKEN,
       "anthropic-version": "2023-06-01",
       "content-type": "application/json",
     },
@@ -719,6 +719,6 @@ app.get("/api/nyheter", async (req, res) => {
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`✅ BoligEffekt backend kjører på port ${PORT}`);
-  console.log(`   CLAUDE_API_KEY: ${process.env.CLAUDE_API_KEY ? "OK" : "MANGLER"}`);
+  console.log(`   CLAUDE_TOKEN: ${process.env.CLAUDE_TOKEN ? "OK" : "MANGLER"}`);
   console.log(`   Frontend URL: ${process.env.FRONTEND_URL}`);
 });
