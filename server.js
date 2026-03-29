@@ -687,9 +687,10 @@ app.post("/api/chat", async (req, res) => {
 let nyheterCache = { data: null, ts: 0 };
 const NYHETER_TTL = 24 * 60 * 60 * 1000;
 
-app.get("/api/nyheter", async (req, res) => {
+app.post("/api/nyheter", async (req, res) => {
+  const tving = req.body?.tving === true;
   const nå = Date.now();
-  if (nyheterCache.data && (nå - nyheterCache.ts < NYHETER_TTL)) {
+  if (!tving && nyheterCache.data && (nå - nyheterCache.ts < NYHETER_TTL)) {
     console.log("[NYHETER] Returnerer fra cache");
     return res.json({ nyheter: nyheterCache.data, fra_cache: true });
   }
