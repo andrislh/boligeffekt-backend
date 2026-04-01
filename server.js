@@ -2,9 +2,11 @@
 // Håndterer: Stripe-betaling, PDF-generering, e-postsending
 
 require("dotenv").config();
-const express  = require("express");
-const cors     = require("cors");
-const { Resend } = require("resend");
+const express     = require("express");
+const cors        = require("cors");
+const helmet      = require("helmet");
+const rateLimit   = require("express-rate-limit");
+const { Resend }  = require("resend");
 const { PDFDocument, rgb, StandardFonts } = require("pdf-lib");
 
 // ── Startup-sjekk ─────────────────────────────────────────────
@@ -22,10 +24,48 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 // onboarding@resend.dev er eneste avsender som fungerer uten domene-verifisering i Resend test-modus
 const FROM_EMAIL = "onboarding@resend.dev";
 
+const ALLOWED_ORIGINS = [
+  "https://boligeffekt.no",
+  "https://www.boligeffekt.no",
+  ...(process.env.NODE_ENV !== "production" ? ["http://localhost:3000"] : []),
+];
+
 const app = express();
-app.use(cors({ origin: "*" }));
+
+// ── Sikkerhetsheadere ─────────────────────────────────────────
+app.use(helmet());
+
+// ── CORS: kun tillatte domener ────────────────────────────────
+app.use(cors({
+  origin: (origin, cb) => {
+    // Tillat forespørsler uten origin (server-til-server, Stripe webhook)
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    cb(new Error("CORS: ikke tillatt"));
+  },
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type"],
+}));
+
+// ── Body-størrelse: maks 50 kb (hindrer store payload-angrep) ─
 app.use("/webhook", express.raw({ type: "application/json" }));
-app.use(express.json());
+app.use(express.json({ limit: "50kb" }));
+
+// ── Rate limiting ─────────────────────────────────────────────
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutter
+  max: 60,                   // maks 60 kall per IP per 15 min
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { feil: "For mange forespørsler – prøv igjen om litt." },
+});
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minutt
+  max: 5,              // maks 5 AI-kall per minutt per IP
+  message: { feil: "For mange AI-forespørsler – vent litt." },
+});
+app.use("/api/", apiLimiter);
+app.use("/api/chat",    aiLimiter);
+app.use("/api/nyheter", aiLimiter);
 
 // ── Hjelpefunksjoner ──────────────────────────────────────────
 
@@ -638,7 +678,7 @@ app.post("/api/lead", async (req, res) => {
 });
 
 // 6. Helsesjekk
-app.get("/", (req, res) => res.json({ status: "BoligEffekt backend kjører", resend: !!process.env.RESEND_API_KEY, stripe: !!process.env.STRIPE_SECRET_KEY, claude: !!process.env.CLAUDE_TOKEN }));
+app.get("/", (req, res) => res.json({ status: "ok" }));
 
 // ── Claude API via fetch (ingen SDK) ──────────────────────────
 async function callClaude({ system, messages, max_tokens = 600 }) {
