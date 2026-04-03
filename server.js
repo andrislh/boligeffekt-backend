@@ -11,12 +11,9 @@ const { PDFDocument, rgb, StandardFonts } = require("pdf-lib");
 
 // ── Startup-sjekk ─────────────────────────────────────────────
 console.log("=== BoligEffekt backend starter ===");
-console.log("RESEND_API_KEY:", process.env.RESEND_API_KEY
-  ? `${process.env.RESEND_API_KEY.slice(0, 8)}... (OK)`
-  : "MANGLER – e-post vil feile!");
-console.log("RESEND_FROM_EMAIL:", process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev (standard test-avsender)");
+console.log("RESEND_API_KEY:", process.env.RESEND_API_KEY ? "OK" : "MANGLER – e-post vil feile!");
 console.log("STRIPE_SECRET_KEY:", process.env.STRIPE_SECRET_KEY ? "OK" : "MANGLER!");
-console.log("FRONTEND_URL:", process.env.FRONTEND_URL || "(ikke satt)");
+console.log("STRIPE_WEBHOOK_SECRET:", process.env.STRIPE_WEBHOOK_SECRET ? "OK" : "MANGLER – webhook vil feile!");
 console.log("NODE_ENV:", process.env.NODE_ENV || "development");
 
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
@@ -66,6 +63,24 @@ const aiLimiter = rateLimit({
 app.use("/api/", apiLimiter);
 app.use("/api/chat",    aiLimiter);
 app.use("/api/nyheter", aiLimiter);
+
+// ── Validering og sanitering ──────────────────────────────────
+
+const GYLDIGE_PAKKER = ["energirapport", "oppgraderingsplan"];
+
+function erEpost(s) {
+  return typeof s === "string" && /^[^@\s]{1,64}@[^@\s]{1,200}\.[^@\s]{2,}$/.test(s) && s.length < 200;
+}
+
+// Unngår XSS i HTML-e-poster ved å escape brukerdata
+function escHtml(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 // ── Hjelpefunksjoner ──────────────────────────────────────────
 
@@ -544,7 +559,18 @@ function pdfDoc_pageCount(n) { return n; }
 app.post("/api/create-checkout", async (req, res) => {
   try {
     const { resultatId, email, resultatData, pakke } = req.body;
-    console.log("[CHECKOUT] Pakke:", pakke, "- E-post:", email);
+
+    // Validering
+    if (!resultatId || typeof resultatId !== "string" || resultatId.length > 200)
+      return res.status(400).json({ feil: "Ugyldig resultatId" });
+    if (email && !erEpost(email))
+      return res.status(400).json({ feil: "Ugyldig e-postadresse" });
+    if (pakke && !GYLDIGE_PAKKER.includes(pakke))
+      return res.status(400).json({ feil: "Ugyldig pakke" });
+    if (!resultatData || typeof resultatData !== "object" || Array.isArray(resultatData))
+      return res.status(400).json({ feil: "Mangler resultatData" });
+
+    console.log("[CHECKOUT] Pakke:", pakke);
 
     const PAKKER = {
       energirapport:     { navn: "BoligEffekt – Energirapport",     beskrivelse: "Energimerke, tiltaksplan, Enova-støtteoversikt, EPBD-status og PDF-rapport", beløp: 19900 },
@@ -567,7 +593,7 @@ app.post("/api/create-checkout", async (req, res) => {
     res.json({ url: session.url, sessionId: session.id });
   } catch (err) {
     console.error("[CHECKOUT] Feil:", err.message);
-    res.status(500).json({ feil: err.message });
+    res.status(500).json({ feil: "Kunne ikke opprette betalingsøkt. Prøv igjen." });
   }
 });
 
@@ -575,11 +601,14 @@ app.post("/api/create-checkout", async (req, res) => {
 app.get("/api/verifiser-betaling", async (req, res) => {
   try {
     const { session_id } = req.query;
+    if (!session_id || typeof session_id !== "string" || !/^cs_[a-zA-Z0-9_]{10,}$/.test(session_id))
+      return res.status(400).json({ feil: "Ugyldig session_id" });
     const session = await stripe.checkout.sessions.retrieve(session_id);
     if (session.payment_status !== "paid") return res.json({ betalt: false });
     res.json({ betalt: true, epost: session.customer_email });
   } catch (err) {
-    res.status(400).json({ feil: err.message });
+    console.error("[VERIFISER] Feil:", err.message);
+    res.status(400).json({ feil: "Kunne ikke verifisere betaling" });
   }
 });
 
@@ -589,9 +618,17 @@ app.post("/api/send-rapport", async (req, res) => {
   try {
     const { session_id, resultatData, epost, pakke } = req.body;
 
-    console.log("[RAPPORT] session_id:", session_id);
+    // Validering
+    if (!session_id || typeof session_id !== "string" || !/^cs_[a-zA-Z0-9_]{10,}$/.test(session_id))
+      return res.status(400).json({ feil: "Ugyldig session_id" });
+    if (epost && !erEpost(epost))
+      return res.status(400).json({ feil: "Ugyldig e-postadresse" });
+    if (pakke && !GYLDIGE_PAKKER.includes(pakke))
+      return res.status(400).json({ feil: "Ugyldig pakke" });
+    if (!resultatData || typeof resultatData !== "object" || Array.isArray(resultatData))
+      return res.status(400).json({ feil: "Mangler resultatData" });
+
     console.log("[RAPPORT] pakke:", pakke);
-    console.log("[RAPPORT] epost:", epost);
     console.log("[RAPPORT] resultatData nøkler:", resultatData ? Object.keys(resultatData) : "MANGLER");
     if (resultatData && resultatData.resultat) {
       console.log("[RAPPORT] resultat.tiltak antall:", resultatData.resultat.tiltak ? resultatData.resultat.tiltak.length : "MANGLER");
@@ -625,22 +662,27 @@ app.post("/api/send-rapport", async (req, res) => {
     }
 
     console.log("[RAPPORT] E-post sendt OK til:", kundeEpost);
-    res.json({ ok: true, epost: kundeEpost });
+    res.json({ ok: true });
   } catch (err) {
     console.error("[RAPPORT] FEIL:", err.message);
     console.error("[RAPPORT] Stack:", err.stack);
-    res.status(500).json({ feil: err.message });
+    res.status(500).json({ feil: "Kunne ikke generere eller sende rapport. Kontakt support." });
   }
 });
 
 // 4. Stripe webhook
 app.post("/webhook", async (req, res) => {
+  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    console.error("[WEBHOOK] STRIPE_WEBHOOK_SECRET mangler – alle webhooks avvises");
+    return res.status(500).end();
+  }
   const sig = req.headers["stripe-signature"];
   let event;
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET || "");
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
-    return res.status(400).send(`Webhook feil: ${err.message}`);
+    console.error("[WEBHOOK] Signatursjekk feilet:", err.message);
+    return res.status(400).end();
   }
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
@@ -652,19 +694,39 @@ app.post("/webhook", async (req, res) => {
 // 5. Lead-registrering
 app.post("/api/lead", async (req, res) => {
   const { navn, telefon, epost, merke, tiltak } = req.body;
-  console.log("NY LEAD:", { navn, telefon, epost, merke, tiltak });
+
+  // Validering
+  if (!navn || typeof navn !== "string" || navn.length > 100)
+    return res.status(400).json({ feil: "Ugyldig navn" });
+  if (!telefon || typeof telefon !== "string" || telefon.length > 20)
+    return res.status(400).json({ feil: "Ugyldig telefon" });
+  if (epost && !erEpost(epost))
+    return res.status(400).json({ feil: "Ugyldig e-post" });
+  if (merke && (typeof merke !== "string" || !/^[A-G]$/.test(merke)))
+    return res.status(400).json({ feil: "Ugyldig merke" });
+  if (tiltak && (!Array.isArray(tiltak) || tiltak.length > 20))
+    return res.status(400).json({ feil: "Ugyldig tiltak" });
+
+  console.log("[LEAD] Ny lead mottatt");
+
+  // Escape all user data before inserting into HTML
+  const sNavn    = escHtml(navn);
+  const sTelefon = escHtml(telefon);
+  const sEpost   = escHtml(epost || "–");
+  const sMerke   = escHtml(merke || "–");
+  const sTiltak  = escHtml(Array.isArray(tiltak) ? tiltak.map(t => String(t).slice(0, 80)).join(", ") : "–");
 
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
       to: "andrislhelle@gmail.com",
-      subject: `Ny lead: ${navn} – Merke ${merke}`,
+      subject: `Ny lead: ${sNavn} – Merke ${sMerke}`,
       html: `
         <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#f0ede8;padding:0 0 28px">
           <div style="background:#1b3a5c;padding:22px 28px"><h2 style="color:white;margin:0;font-size:18px">BoligEffekt – Ny lead</h2></div>
           <div style="padding:24px 28px">
             <table style="width:100%;border-collapse:collapse;background:white;border-radius:10px;overflow:hidden">
-              ${[["Navn", navn], ["Telefon", telefon], ["E-post", epost || "–"], ["Energimerke", `Merke ${merke}`], ["Topp tiltak", (tiltak||[]).join(", ") || "–"]]
+              ${[["Navn", sNavn], ["Telefon", sTelefon], ["E-post", sEpost], ["Energimerke", `Merke ${sMerke}`], ["Topp tiltak", sTiltak]]
                 .map(([k, v]) => `<tr><td style="padding:11px 16px;color:#6b7a8d;font-size:13px;border-bottom:1px solid #f0ede8;width:38%">${k}</td><td style="padding:11px 16px;font-weight:700;color:#0f2540;font-size:13px;border-bottom:1px solid #f0ede8">${v}</td></tr>`).join("")}
             </table>
           </div>
@@ -703,8 +765,13 @@ async function callClaude({ system, messages, max_tokens = 600 }) {
 // 7. Chat
 app.post("/api/chat", async (req, res) => {
   const { melding, historikk = [] } = req.body;
-  if (!melding) return res.status(400).json({ feil: "Mangler melding" });
-  console.log("[CHAT] Melding:", melding.slice(0, 80));
+  if (!melding || typeof melding !== "string")
+    return res.status(400).json({ feil: "Mangler melding" });
+  if (melding.length > 2000)
+    return res.status(400).json({ feil: "Melding for lang (maks 2000 tegn)" });
+  if (!Array.isArray(historikk) || historikk.length > 30)
+    return res.status(400).json({ feil: "Ugyldig historikk" });
+  console.log("[CHAT] Melding mottatt");
   try {
     const messages = [
       ...historikk.map(h => ({ role: h.rolle === "user" ? "user" : "assistant", content: h.innhold })),
@@ -761,5 +828,5 @@ const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`✅ BoligEffekt backend kjører på port ${PORT}`);
   console.log(`   CLAUDE_TOKEN: ${process.env.CLAUDE_TOKEN ? "OK" : "MANGLER"}`);
-  console.log(`   Frontend URL: ${process.env.FRONTEND_URL}`);
+  console.log(`   FRONTEND_URL: ${process.env.FRONTEND_URL ? "OK" : "MANGLER"}`);
 });
