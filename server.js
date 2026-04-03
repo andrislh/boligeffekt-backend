@@ -19,7 +19,7 @@ console.log("NODE_ENV:", process.env.NODE_ENV || "development");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const resend = new Resend(process.env.RESEND_API_KEY);
 // onboarding@resend.dev er eneste avsender som fungerer uten domene-verifisering i Resend test-modus
-const FROM_EMAIL = "onboarding@resend.dev";
+const FROM_EMAIL = "rapport@boligeffekt.no";
 
 const ALLOWED_ORIGINS = [
   "https://boligeffekt.no",
