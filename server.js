@@ -194,7 +194,9 @@ async function lagPDF(data, pakke) {
   side1.drawText("Sortert etter tilbakebetalingstid", { x: 40, y: y - 18, size: 9,  font: fontNormal, color: grå });
 
   y -= 40;
-  const høyPrioritet = tiltak.filter(t => t.prioritet === "høy").slice(0, 6);
+  // For oppgraderingsplan: tiltak er allerede brukervalgte – vis alle.
+  // For energirapport: vis kun høy-prioritet tiltak.
+  const høyPrioritet = (pakke === "oppgraderingsplan" ? tiltak : tiltak.filter(t => t.prioritet === "høy")).slice(0, 6);
   høyPrioritet.forEach((t, i) => {
     if (y < 80) return;
     const erMørk = i % 2 === 0;
@@ -250,7 +252,8 @@ async function lagPDF(data, pakke) {
     side2.drawText("Oppgraderingsplan – Side 2",
       { x: 40, y: height - 72, size: 11, font: fontNormal, color: rgb(0.7, 0.9, 0.7) });
 
-    const høy = tiltak.filter(t => t.prioritet === "høy");
+    // tiltak er allerede brukervalgte – ikke filtrer på prioritet
+    const høy = tiltak;
     const totInv    = høy.reduce((s, t) => s + t.kostnad_snitt, 0);
     const totStøtte = høy.reduce((s, t) => s + t.støtte_snitt, 0);
     const netto     = totInv - totStøtte;
@@ -458,7 +461,8 @@ async function sendEpostOppgradering(epostAdresse, pdfBytes, data) {
   console.log("[E-POST] Sender Oppgraderingsplan til:", epostAdresse);
   console.log("[E-POST] Fra:", FROM_EMAIL);
   const { merke, kwhPerM2, tiltak, bygData, merkePotensial, totalKwh } = data.resultat;
-  const høy       = tiltak.filter(t => t.prioritet === "høy");
+  // tiltak er allerede brukervalgte tiltak fra den interaktive flyten – ikke filtrer på prioritet
+  const høy       = tiltak;
   const totInv    = høy.reduce((s, t) => s + t.kostnad_snitt, 0);
   const totStøtte = høy.reduce((s, t) => s + t.støtte_snitt, 0);
   const netto     = totInv - totStøtte;
