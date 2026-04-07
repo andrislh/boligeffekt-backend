@@ -3,8 +3,8 @@
   "platforms": ["tiktok", "instagram_reels"],
   "month": "April 2026",
   "strategy_notes": {
-    "tiktok": "7-15 sek, rask hook i første 2 sek, undertekster alltid på, curiosity-drevet åpning",
-    "instagram_reels": "15-30 sek, mer polert, fokus på saves og replays, lengre livsløp (70 dager)"
+    "tiktok": "20-30 sek, 3 scener, rask hook i første 2 sek, norsk voiceover",
+    "instagram_reels": "20-30 sek, 3 scener, mer polert, norsk voiceover + undertekster"
   },
   "posts": [
     {
@@ -12,123 +12,159 @@
       "title": "Curiosity Hook – Strømregning",
       "platform_primary": "tiktok",
       "format": "curiosity_hook",
-      "hook_text": "Kan du gjette hva denne norske hytta koster å varme opp per måned?",
-      "reveal_text": "Over 8 000 kr. Med energioppgradering: 1 200 kr.",
-      "cta": "Finn ut hva din bolig koster → link i bio",
-      "veo_prompt": "Close up of a Norwegian wooden house exterior at night in winter, single warm light in window, snow falling, mysterious cinematic mood, no text, 9:16 portrait format, slow push-in camera movement",
-      "image_first_frame_prompt": "A Norwegian wooden hytte at night in winter, single warm glowing window, snow falling gently, dark moody sky, photorealistic, cinematic",
-      "duration_seconds": 8,
-      "aspect_ratio": "9:16",
-      "caption_overlay": ["Kan du gjette?", "8 000 kr/mnd", "→ Etter BoligEffekt: 1 200 kr"],
+      "voiceover_script": "Kan du gjette hva denne norske boligen koster å varme opp om vinteren? Over åtte tusen kroner i måneden. BoligEffekt analyserer boligen din og finner ut nøyaktig hva du kan spare. Med riktig energioppgradering kan du komme ned i tolv hundre kroner — samme bolig, samme komfort. Gå til boligeffekt.no og få din gratis energianalyse i dag.",
+      "caption_overlay": ["8 000 kr/mnd?", "BoligEffekt analyserer boligen din", "→ boligeffekt.no"],
+      "cta": "Gratis energianalyse på boligeffekt.no",
+      "output_filename": "01-curiosity-strom.mp4",
       "estimated_engagement": "høy – curiosity hook + reveal",
-      "output_filename": "01-curiosity-strom.mp4"
+      "scenes": [
+        {
+          "order": 1,
+          "description": "Hook – mystisk vinterhus",
+          "image_prompt": "A modern Norwegian single-family house exterior at night in deep winter, one warm glowing window, heavy snow falling, dark moody sky, photorealistic, cinematic, suburban neighborhood",
+          "veo_prompt": "Slow cinematic push-in toward a modern Norwegian single-family house at night in winter, one warm light glowing from a window, heavy snow falling, dark moody atmosphere, no text, no overlays, photorealistic, 9:16 portrait"
+        },
+        {
+          "order": 2,
+          "description": "Problem – kald, dyr bolig",
+          "image_prompt": "Cold Norwegian living room interior, grey winter light, frost on window corners, worn radiator visible, photorealistic, wide shot",
+          "veo_prompt": "Cinematic shot of a cold dim Norwegian living room in winter, grey light through frosted windows, cold atmosphere, slow dolly movement, no text, no overlays, photorealistic, 9:16 portrait"
+        },
+        {
+          "order": 3,
+          "description": "Løsning – BoligEffekt energioppgradering",
+          "image_prompt": "Warm cozy modern Norwegian living room after renovation, golden light, large windows, Scandinavian interior design, energy efficient, photorealistic",
+          "veo_prompt": "Warm golden light fills a beautifully renovated modern Norwegian living room, cozy Scandinavian interior, snow visible outside through large windows, steam from coffee cup, hopeful atmosphere, slow pan, no text, no overlays, photorealistic, 9:16 portrait"
+        }
+      ]
     },
     {
       "id": 2,
       "title": "Før/Etter – Kald vs Varm Bolig",
       "platform_primary": "both",
       "format": "before_after",
-      "hook_text": "Samme hus. 6 måneder senere.",
-      "reveal_text": "Energimerke G → A. Strøm spart: 72%.",
-      "cta": "Få din gratis energianalyse på boligeffekt.no",
-      "veo_prompt": "Split screen cinematic video: left side shows cold drafty Norwegian house interior with frost on windows, grey light, right side shows same room warm golden light, modern insulation visible, cozy Scandinavian interior, smooth transition between the two, 9:16 portrait format",
-      "image_first_frame_prompt": "Cold grey Norwegian living room interior with frost on windows, dim light, photorealistic, cinematic wide shot",
-      "duration_seconds": 8,
-      "aspect_ratio": "9:16",
-      "caption_overlay": ["Samme hus.", "6 måneder senere.", "Energimerke G → A"],
+      "voiceover_script": "Dette er den samme boligen — med seks måneders mellomrom. Før: energimerke G, kald, trekkfull, og åtte tusen kroner i strøm hver måned. BoligEffekt gjennomfører en komplett energianalyse og lager en konkret oppgraderingsplan tilpasset akkurat din bolig. Etter: energimerke A, varm, komfortabel — og strømregningen nesten borte. Finn ut hva din bolig kan bli på boligeffekt.no.",
+      "caption_overlay": ["Samme hus. 6 måneder.", "Energimerke G → A", "Spar 70 000 kr/år"],
+      "cta": "Få din energianalyse på boligeffekt.no",
+      "output_filename": "02-foer-etter.mp4",
       "estimated_engagement": "høyest – bevist beste format",
-      "output_filename": "02-foer-etter.mp4"
+      "scenes": [
+        {
+          "order": 1,
+          "description": "Før – kald bolig",
+          "image_prompt": "Cold grey Norwegian living room interior with frost on windows, dim light, worn furniture, photorealistic, cinematic wide shot",
+          "veo_prompt": "Cold grey Norwegian living room in winter, frost on windows, dim light, cold and uncomfortable atmosphere, slow camera movement, no text, no overlays, photorealistic, 9:16 portrait"
+        },
+        {
+          "order": 2,
+          "description": "BoligEffekt prosessen",
+          "image_prompt": "Energy consultant with tablet doing home energy audit in Norwegian house, professional, modern, photorealistic",
+          "veo_prompt": "Professional energy consultant walking through a Norwegian house interior with a tablet, examining walls and windows, modern professional setting, purposeful movement, no text, no overlays, photorealistic, 9:16 portrait"
+        },
+        {
+          "order": 3,
+          "description": "Etter – varm energieffektiv bolig",
+          "image_prompt": "Warm bright modern Norwegian living room after energy renovation, golden light, new windows, Scandinavian design, family comfortable, photorealistic",
+          "veo_prompt": "Bright warm modern Norwegian living room after full energy renovation, golden afternoon light, new large windows, cozy Scandinavian interior, happy peaceful atmosphere, slow dolly, no text, no overlays, photorealistic, 9:16 portrait"
+        }
+      ]
     },
     {
       "id": 3,
-      "title": "Drone – Norsk Boligfelt Vinter",
+      "title": "Drone – Norsk Boligfelt",
       "platform_primary": "instagram_reels",
       "format": "cinematic_drone",
-      "hook_text": "Slik ser fremtidens norske nabolag ut.",
-      "reveal_text": "Alle husene her er energimerke A. Strøm fra solen. Varme fra bakken.",
-      "cta": "Start reisen på boligeffekt.no",
-      "veo_prompt": "Aerial drone shot slowly rising above a Norwegian residential neighborhood in winter, snow on rooftops, morning golden hour light, peaceful Scandinavian suburb, cinematic, photorealistic, 9:16 portrait format",
-      "image_first_frame_prompt": "Aerial view of Norwegian residential neighborhood in winter, snow covered rooftops, golden morning light, photorealistic drone shot",
-      "duration_seconds": 8,
-      "aspect_ratio": "9:16",
-      "caption_overlay": ["Fremtidens nabolag", "Energimerke A", "Alle husene her"],
+      "voiceover_script": "Tusenvis av norske boliger bruker mye mer energi enn de trenger. Energimerke G og F er standarden i eldre norske boligfelt — men det trenger ikke å være slik. BoligEffekt hjelper norske boligeiere med å forstå nøyaktig hva som skal til for å oppgradere. Solenergi, bedre isolasjon, varmepumpe — skreddersydd for din bolig. Start reisen på boligeffekt.no.",
+      "caption_overlay": ["Norske boliger sløser energi", "BoligEffekt finner løsningen", "→ boligeffekt.no"],
+      "cta": "Start på boligeffekt.no",
+      "output_filename": "03-drone-nabolag.mp4",
       "estimated_engagement": "middels-høy – aspirasjonelt, sterk på Instagram",
-      "output_filename": "03-drone-nabolag.mp4"
+      "scenes": [
+        {
+          "order": 1,
+          "description": "Drone over nabolag",
+          "image_prompt": "Aerial view of Norwegian residential neighborhood with modern houses in winter, snow covered rooftops, golden morning light, photorealistic drone shot",
+          "veo_prompt": "Aerial drone shot slowly rising above a Norwegian residential neighborhood with modern single-family houses in winter, snow on rooftops, golden morning light, no text, no overlays, cinematic, photorealistic, 9:16 portrait"
+        },
+        {
+          "order": 2,
+          "description": "Zoom inn på én bolig",
+          "image_prompt": "Modern Norwegian house exterior close up in winter morning light, clean suburban street, snow on ground, photorealistic",
+          "veo_prompt": "Cinematic slow zoom toward a single modern Norwegian house on a quiet suburban street in winter, morning light, snow on ground and roof, warm light inside, no text, no overlays, photorealistic, 9:16 portrait"
+        },
+        {
+          "order": 3,
+          "description": "Solceller og energioppgradering",
+          "image_prompt": "Modern Norwegian house with solar panels on roof in winter, energy efficient, clean and modern, snow around, photorealistic",
+          "veo_prompt": "Modern Norwegian house with solar panels on the roof in winter sunlight, snow on ground, clean energy efficient home, slight camera tilt up revealing the panels, hopeful mood, no text, no overlays, photorealistic, 9:16 portrait"
+        }
+      ]
     },
     {
       "id": 4,
-      "title": "POV – Du Får Energimerke A",
+      "title": "POV – Energianalysen",
       "platform_primary": "tiktok",
       "format": "pov_storytelling",
-      "hook_text": "POV: du åpner postkassen og ser energimerke A for første gang",
-      "reveal_text": "Det tok 3 uker. Og nå sparer du 60 000 kr i året.",
-      "cta": "Din tur → boligeffekt.no",
-      "veo_prompt": "POV shot of hands opening a Norwegian mailbox, pulling out an official energy certificate document showing grade A, warm sunlight, shallow depth of field, cinematic close-up, 9:16 portrait format",
-      "image_first_frame_prompt": "Close up of a hand reaching toward a Norwegian residential mailbox, warm daylight, photorealistic, shallow depth of field",
-      "duration_seconds": 8,
-      "aspect_ratio": "9:16",
-      "caption_overlay": ["POV: Energimerke A", "i postkassen din", "60 000 kr spart/år"],
-      "estimated_engagement": "høy – POV format + personlig vinkling",
-      "output_filename": "04-pov-energimerke.mp4"
+      "voiceover_script": "POV: du har endelig bestilt energianalyse av boligen din. En BoligEffekt-rådgiver kommer hjem til deg, går gjennom alt — isolasjon, vinduer, oppvarmingssystem. Du får en konkret rapport med nøyaktig hva som skal til og hva du kan spare. Tre uker senere er oppgraderingen ferdig. Energimerke A. Og strømregningen? Nesten borte. Det starter på boligeffekt.no.",
+      "caption_overlay": ["POV: Energianalyse bestilt", "Rådgiver kommer hjem", "Resultat: Energimerke A"],
+      "cta": "Bestill på boligeffekt.no",
+      "output_filename": "04-pov-energianalyse.mp4",
+      "estimated_engagement": "høy – POV format + personlig",
+      "scenes": [
+        {
+          "order": 1,
+          "description": "POV – rådgiver ankommer",
+          "image_prompt": "POV shot from homeowner perspective, professional energy consultant arriving at Norwegian house front door, winter day, photorealistic",
+          "veo_prompt": "POV shot from homeowner perspective looking at front door of Norwegian house opening, professional consultant entering with clipboard and tablet, winter daylight outside, welcoming atmosphere, no text, no overlays, photorealistic, 9:16 portrait"
+        },
+        {
+          "order": 2,
+          "description": "Gjennomgang av boligen",
+          "image_prompt": "Energy consultant examining wall insulation in Norwegian home interior, using measuring tools, professional, photorealistic",
+          "veo_prompt": "Energy consultant carefully examining walls and windows inside a Norwegian home, using professional measuring tools and tablet, thorough inspection, good lighting, no text, no overlays, photorealistic, 9:16 portrait"
+        },
+        {
+          "order": 3,
+          "description": "Resultatet – energimerke A",
+          "image_prompt": "Homeowner holding Norwegian energy certificate document showing grade A rating, happy expression, warm home interior background, photorealistic",
+          "veo_prompt": "Close up of hands holding an official Norwegian energy certificate document, warm home interior in background, golden light, satisfied mood, slow zoom in on document, no text, no overlays, photorealistic, 9:16 portrait"
+        }
+      ]
     },
     {
       "id": 5,
-      "title": "Edutainment – Energiskala Forklart",
-      "platform_primary": "both",
-      "format": "edutainment",
-      "hook_text": "Ingen forteller deg dette om energimerker.",
-      "reveal_text": "G koster deg 120 000 kr mer enn A – over 10 år. Det er en Tesla.",
-      "cta": "Sjekk hva ditt hus koster → boligeffekt.no",
-      "veo_prompt": "Cinematic slow pan across a Norwegian house facade in autumn, warm golden light, leaves falling, camera slowly reveals an energy label A on the front door, photorealistic, elegant, 9:16 portrait format",
-      "image_first_frame_prompt": "Norwegian house facade in autumn golden light, leaves on ground, photorealistic, cinematic, warm atmosphere",
-      "duration_seconds": 8,
-      "aspect_ratio": "9:16",
-      "caption_overlay": ["Ingen forteller deg dette", "Merke G = 120 000 kr ekstra", "Over 10 år. En hel Tesla."],
-      "estimated_engagement": "middels – sterk hook redder infographic-svakheten",
-      "output_filename": "05-edutainment-energiskala.mp4"
-    },
-    {
-      "id": 6,
-      "title": "Cinematic – Varm Stue Vintermorgon",
-      "platform_primary": "instagram_reels",
-      "format": "lifestyle_cinematic",
-      "hook_text": "Slik starter morgonen i et energimerke A-hus.",
-      "reveal_text": "18 grader ute. 22 grader inne. Uten å tenke på strøm.",
-      "cta": "Gjør hjemmet ditt til dette → boligeffekt.no",
-      "veo_prompt": "Cinematic interior shot of a cozy modern Norwegian living room on a winter morning, warm golden light through large windows, snow visible outside, steam rising from a coffee cup, peaceful and aspirational, slow dolly movement, 9:16 portrait format",
-      "image_first_frame_prompt": "Cozy modern Norwegian living room interior, winter morning, warm golden light through large windows, snow outside, coffee cup in foreground, photorealistic, aspirational",
-      "duration_seconds": 8,
-      "aspect_ratio": "9:16",
-      "caption_overlay": ["Slik starter morgonen", "i et energimerke A-hus", "18° ute. 22° inne."],
-      "estimated_engagement": "middels – sterk på Instagram, svakere TikTok",
-      "output_filename": "06-cinematic-stue.mp4"
-    },
-    {
-      "id": 7,
-      "title": "Shock Hook – Sjokket Huseier",
+      "title": "Shock Hook – Strømregningen",
       "platform_primary": "tiktok",
       "format": "emotion_hook",
-      "hook_text": "Reaksjonen hennes da hun så strømregningen for siste gang.",
-      "reveal_text": "Etter BoligEffekt: aldri mer sjokk i postkassen.",
-      "cta": "Gratis analyse → boligeffekt.no",
-      "veo_prompt": "Cinematic close-up of a Norwegian front door opening on a winter day, a hand picks up mail from inside a mailbox slot, slow motion, dramatic lighting, warm interior light contrasting cold exterior, 9:16 portrait format",
-      "image_first_frame_prompt": "Norwegian front door in winter, warm light inside visible through frosted glass, hand near mailbox slot, cinematic close up, photorealistic",
-      "duration_seconds": 8,
-      "aspect_ratio": "9:16",
-      "caption_overlay": ["Reaksjonen hennes", "da hun så regningen", "→ Aldri mer med BoligEffekt"],
-      "estimated_engagement": "høy – emotion hook driver TikTok-deling",
-      "output_filename": "07-shock-huseier.mp4"
+      "voiceover_script": "Ni av ti norske huseiere vet ikke hva energimerket på boligen deres er. Og det koster dem dyrt. En bolig med energimerke G kan koste opptil sytti tusen kroner mer i strøm per år enn en tilsvarende bolig med merke A. BoligEffekt gjør energianalysen enkel — du får vite nøyaktig hva din bolig bruker, og en konkret plan for å endre det. Sjekk boligeffekt.no i dag.",
+      "caption_overlay": ["9 av 10 vet ikke energimerket", "Det koster 70 000 kr/år", "BoligEffekt fikser det"],
+      "cta": "Sjekk boligen din på boligeffekt.no",
+      "output_filename": "05-shock-strom.mp4",
+      "estimated_engagement": "høy – shock hook driver TikTok-deling",
+      "scenes": [
+        {
+          "order": 1,
+          "description": "Shock – høy strømregning",
+          "image_prompt": "Close up of a Norwegian energy bill showing very high amount, hand holding it, shocked expression blur in background, dramatic lighting, photorealistic",
+          "veo_prompt": "Dramatic close up of a hand holding a Norwegian electricity bill, high amount visible, shocked person blurred in background, dramatic lighting, slow zoom in, no text on screen, no overlays, photorealistic, 9:16 portrait"
+        },
+        {
+          "order": 2,
+          "description": "Årsaken – dårlig isolert bolig",
+          "image_prompt": "Thermal camera view of Norwegian house showing heat loss through walls and windows, orange and red heat signature, winter exterior, photorealistic",
+          "veo_prompt": "Thermal imaging view of a Norwegian house exterior at night showing significant heat loss through walls and windows, orange and red thermal signature, winter night, revealing camera movement, no text, no overlays, cinematic, 9:16 portrait"
+        },
+        {
+          "order": 3,
+          "description": "BoligEffekt løsningen",
+          "image_prompt": "Modern energy efficient Norwegian house exterior in winter, well insulated, solar panels, warm interior light, clean and contemporary, photorealistic",
+          "veo_prompt": "Beautiful modern energy-efficient Norwegian house in winter, well-insulated facade, solar panels on roof, warm golden light from windows, snow falling gently, hopeful and aspirational mood, slow push-in, no text, no overlays, photorealistic, 9:16 portrait"
+        }
+      ]
     }
   ],
   "posting_schedule": {
     "tiktok": ["tirsdag 18:00", "torsdag 19:00", "lørdag 12:00"],
     "instagram_reels": ["mandag 17:00", "onsdag 18:00", "fredag 17:00", "søndag 11:00"]
-  },
-  "content_mix": {
-    "curiosity_hook": "30%",
-    "before_after": "25%",
-    "cinematic_lifestyle": "20%",
-    "pov_storytelling": "15%",
-    "edutainment": "10%"
   }
 }
