@@ -747,13 +747,21 @@ app.post("/api/lead", async (req, res) => {
 app.get("/", (req, res) => res.json({ status: "ok" }));
 
 // ── Claude API via fetch (ingen SDK) ──────────────────────────
+// Støtter flere mulige navn på API-nøkkelen i Railway/miljøvariabler
+const CLAUDE_API_KEY =
+  process.env.CLAUDE_TOKEN ||
+  process.env.CLAUDE_API_KEY ||
+  process.env.ANTHROPIC_API_KEY ||
+  "";
+
 async function callClaude({ system, messages, max_tokens = 600 }) {
+  if (!CLAUDE_API_KEY) throw new Error("Claude API-nøkkel mangler (sett CLAUDE_API_KEY i Railway)");
   const body = { model: "claude-sonnet-4-20250514", max_tokens, messages };
   if (system) body.system = system;
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
-      "x-api-key": process.env.CLAUDE_TOKEN,
+      "x-api-key": CLAUDE_API_KEY,
       "anthropic-version": "2023-06-01",
       "content-type": "application/json",
     },
@@ -831,6 +839,7 @@ app.post("/api/nyheter", async (req, res) => {
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`✅ BoligEffekt backend kjører på port ${PORT}`);
-  console.log(`   CLAUDE_TOKEN: ${process.env.CLAUDE_TOKEN ? "OK" : "MANGLER"}`);
-  console.log(`   FRONTEND_URL: ${process.env.FRONTEND_URL ? "OK" : "MANGLER"}`);
+  console.log(`   CLAUDE_API_KEY: ${CLAUDE_API_KEY ? "OK" : "MANGLER – chat og nyheter vil feile!"}`);
+  console.log(`   RESEND_API_KEY: ${process.env.RESEND_API_KEY ? "OK" : "MANGLER – e-post vil feile!"}`);
+  console.log(`   FRONTEND_URL:   ${process.env.FRONTEND_URL || "ikke satt"}`);
 });
