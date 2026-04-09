@@ -1,0 +1,9 @@
+node_modules
+output
+.git
+.claude
+*.md
+test-video-gen.js
+generate-social-videos.js
+content-plan.json
+env
