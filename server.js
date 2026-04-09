@@ -55,14 +55,28 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
   message: { feil: "For mange forespørsler – prøv igjen om litt." },
 });
-const aiLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minutt
-  max: 5,              // maks 5 AI-kall per minutt per IP
-  message: { feil: "For mange AI-forespørsler – vent litt." },
+// Chat: maks 3 meldinger per minutt og 30 per dag per IP
+const chatMinuttLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 3,
+  message: { feil: "For mange meldinger – vent litt før du sender neste." },
 });
+const chatDagLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  max: 30,
+  message: { feil: "Du har nådd dagens grense for chat. Prøv igjen i morgen." },
+});
+
+// Nyheter: maks 2 oppdateringer per time per IP (resten serveres fra cache)
+const nyheterLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 2,
+  message: { feil: "For mange nyheterforespørsler – prøv igjen om litt." },
+});
+
 app.use("/api/", apiLimiter);
-app.use("/api/chat",    aiLimiter);
-app.use("/api/nyheter", aiLimiter);
+app.use("/api/chat",    chatMinuttLimiter, chatDagLimiter);
+app.use("/api/nyheter", nyheterLimiter);
 
 // ── Validering og sanitering ──────────────────────────────────
 
