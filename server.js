@@ -150,27 +150,42 @@ async function lagPDF(data, pakke) {
   const fontBold   = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontNormal = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-  const navy   = rgb(0.067, 0.227, 0.361);
-  const green  = rgb(0.165, 0.710, 0.353);
-  const grå    = rgb(0.42, 0.48, 0.55);
-  const lys    = rgb(0.96, 0.96, 0.95);
-  const hvit   = rgb(1, 1, 1);
-  const oransj = rgb(0.97, 0.58, 0.11);
+  const navy    = rgb(0.067, 0.227, 0.361);
+  const navyDk  = rgb(0.039, 0.133, 0.220);
+  const green   = rgb(0.165, 0.710, 0.353);
+  const greenLt = rgb(0.882, 0.969, 0.914);
+  const grå     = rgb(0.42, 0.48, 0.55);
+  const gråLt   = rgb(0.62, 0.67, 0.73);
+  const lys     = rgb(0.965, 0.961, 0.953);
+  const lysGrå  = rgb(0.94, 0.94, 0.94);
+  const hvit    = rgb(1, 1, 1);
+  const oransj  = rgb(0.97, 0.58, 0.11);
+  const oransjLt = rgb(0.99, 0.95, 0.88);
 
-  // ── Side 1: Standard energirapport ─────────────────────────
-  const side1 = pdfDoc.addPage([595, 842]);
-  const { width, height } = side1.getSize();
+  // Helper: tegn seksjonsheader med grønn venstre-aksent
+  function seksjonHeader(side, tekst, x, y) {
+    side.drawRectangle({ x, y: y - 2, width: 3, height: 16, color: green });
+    side.drawText(tekst, { x: x + 10, y, size: 11, font: fontBold, color: navy });
+  }
 
-  // Header
-  side1.drawRectangle({ x: 0, y: height - 90, width, height: 90, color: navy });
-  side1.drawText("BoligEffekt", { x: 40, y: height - 52, size: 22, font: fontBold, color: hvit });
-  side1.drawText(pakke === "oppgraderingsplan" ? "Oppgraderingsplan" : "Energirapport",
-    { x: 40, y: height - 72, size: 11, font: fontNormal, color: rgb(0.7, 0.9, 0.7) });
+  // Helper: tegn footer
+  function footer(side) {
+    side.drawRectangle({ x: 0, y: 0, width: 595, height: 40, color: lys });
+    side.drawRectangle({ x: 0, y: 40, width: 595, height: 1, color: lysGrå });
+    side.drawText("BoligEffekt – Estimat basert på NS-EN ISO 52000 og TEK-historikk – Ikke offisielt energimerke",
+      { x: 40, y: 14, size: 7.5, font: fontNormal, color: grå });
+    side.drawText("boligeffekt.no", { x: 595 - 100, y: 14, size: 7.5, font: fontBold, color: navy });
+  }
 
-  const dato = new Date().toLocaleDateString("nb-NO", { day: "2-digit", month: "long", year: "numeric" });
-  side1.drawText(safePDF(dato), { x: width - 140, y: height - 55, size: 10, font: fontNormal, color: rgb(0.7, 0.7, 0.7) });
+  // Helper: tegn sideheader
+  function sideHeader(side, undertittel, sidenr, totalt) {
+    side.drawRectangle({ x: 0, y: 842 - 72, width: 595, height: 72, color: navy });
+    side.drawRectangle({ x: 0, y: 842 - 74, width: 595, height: 2, color: green });
+    side.drawText("BoligEffekt", { x: 40, y: 842 - 44, size: 20, font: fontBold, color: hvit });
+    side.drawText(undertittel, { x: 40, y: 842 - 62, size: 9.5, font: fontNormal, color: rgb(0.65, 0.85, 0.65) });
+    side.drawText(`Side ${sidenr} av ${totalt}`, { x: 595 - 80, y: 842 - 52, size: 8, font: fontNormal, color: rgb(0.55, 0.65, 0.75) });
+  }
 
-  // Energimerke-boks
   const merkeFarger = {
     A: rgb(0, 0.65, 0.32), B: rgb(0.34, 0.73, 0.28), C: rgb(0.71, 0.83, 0.2),
     D: rgb(1, 0.82, 0),    E: rgb(0.97, 0.58, 0.11), F: rgb(0.93, 0.11, 0.14),
@@ -178,95 +193,126 @@ async function lagPDF(data, pakke) {
   };
   const mFarge = merkeFarger[merke.merke] || navy;
 
-  side1.drawRectangle({ x: 40, y: height - 200, width: 120, height: 90, color: mFarge, borderRadius: 8 });
-  side1.drawText(merke.merke, { x: 75, y: height - 162, size: 48, font: fontBold, color: hvit });
+  const totSider = pakke === "oppgraderingsplan" ? 3 : 1;
 
-  side1.drawText("Estimert energimerke",       { x: 175, y: height - 120, size: 10, font: fontBold,   color: grå });
-  side1.drawText(safePDF(`Merke ${merke.merke} - ${merke.epbd}`),
-                                                { x: 175, y: height - 140, size: 16, font: fontBold,   color: navy });
-  side1.drawText(safePDF(bygData.label),        { x: 175, y: height - 160, size: 10, font: fontNormal, color: grå });
-  side1.drawText(safePDF(`Klimasone: ${klima.label.split("(")[0].trim()}`),
-                                                { x: 175, y: height - 178, size: 10, font: fontNormal, color: grå });
+  // ── Side 1: Standard energirapport ─────────────────────────
+  const side1 = pdfDoc.addPage([595, 842]);
 
-  // Nøkkeltall-bokser
-  let y = height - 240;
-  const colW = (width - 80) / 3;
-  [0, 1, 2].forEach(i => side1.drawRectangle({ x: 40 + colW * i, y: y - 50, width: colW - 8, height: 60, color: lys, borderRadius: 6 }));
+  sideHeader(side1, pakke === "oppgraderingsplan" ? "Oppgraderingsplan" : "Energirapport", 1, totSider);
 
-  [
-    { lbl: "Levert energi",     val: `${kwhPerM2} kWh/m2/ar`,                   x: 50 },
-    { lbl: "Totalt forbruk",    val: `${totalKwh.toLocaleString("no")} kWh/ar`,  x: 50 + colW },
-    { lbl: "Est. stromkostnad", val: `${strømkostnad.toLocaleString("no")} kr/ar`, x: 50 + colW * 2 },
-  ].forEach(c => {
-    side1.drawText(safePDF(c.lbl), { x: c.x, y: y - 18, size: 8, font: fontBold,   color: grå });
-    side1.drawText(safePDF(c.val), { x: c.x, y: y - 38, size: 11, font: fontBold,   color: navy });
+  const dato = new Date().toLocaleDateString("nb-NO", { day: "2-digit", month: "long", year: "numeric" });
+  side1.drawText(safePDF(dato), { x: 595 - 140, y: 842 - 44, size: 9, font: fontNormal, color: rgb(0.6, 0.72, 0.85) });
+
+  // ── Energimerke-seksjon ─────────────────────────────────────
+  let y = 842 - 90;
+
+  // Merke-boks (stor)
+  side1.drawRectangle({ x: 40, y: y - 88, width: 100, height: 92, color: mFarge, borderRadius: 6 });
+  // Merke-bokstav sentrert
+  const merkeBokstavX = merke.merke === "W" ? 60 : 61;
+  side1.drawText(merke.merke, { x: merkeBokstavX, y: y - 58, size: 52, font: fontBold, color: hvit });
+  // Label under merke
+  side1.drawRectangle({ x: 40, y: y - 88, width: 100, height: 18, color: navyDk, borderRadius: 0 });
+  side1.drawText("ENERGIMERKE", { x: 44, y: y - 83, size: 6.5, font: fontBold, color: rgb(0.7, 0.85, 0.7) });
+
+  // Merke-info til høyre
+  side1.drawText("Estimert energimerke", { x: 155, y: y - 10, size: 8, font: fontNormal, color: grå });
+  side1.drawText(safePDF(`Merke ${merke.merke} – ${merke.epbd}`), { x: 155, y: y - 30, size: 15, font: fontBold, color: navy });
+  side1.drawRectangle({ x: 155, y: y - 44, width: 200, height: 1, color: lysGrå });
+  side1.drawText(safePDF(bygData.label), { x: 155, y: y - 56, size: 9, font: fontNormal, color: grå });
+  side1.drawText(safePDF(`Klimasone: ${klima.label.split("(")[0].trim()}`), { x: 155, y: y - 70, size: 9, font: fontNormal, color: grå });
+
+  // Energiskala A–G
+  const skalaX = 380;
+  const skalaY = y - 10;
+  ["A","B","C","D","E","F","G"].forEach((bkst, i) => {
+    const erAktiv = bkst === merke.merke;
+    const farge = merkeFarger[bkst];
+    const bW = erAktiv ? 28 : 22;
+    side1.drawRectangle({ x: skalaX + i * 25, y: skalaY - 16, width: bW, height: 18,
+      color: erAktiv ? farge : rgb(0.88, 0.88, 0.88), borderRadius: 2 });
+    side1.drawText(bkst, { x: skalaX + i * 25 + (erAktiv ? 8 : 6), y: skalaY - 10,
+      size: erAktiv ? 9 : 7.5, font: fontBold, color: erAktiv ? hvit : rgb(0.7, 0.7, 0.7) });
+  });
+  side1.drawText("Energiskala", { x: skalaX, y: skalaY - 26, size: 7, font: fontNormal, color: gråLt });
+
+  y -= 108;
+
+  // ── Nøkkeltall-bokser ───────────────────────────────────────
+  const colW = (595 - 80) / 3;
+  const metrikker = [
+    { lbl: "Levert energi",      val: `${kwhPerM2} kWh/m²/år`,                      ikon: "~" },
+    { lbl: "Totalt forbruk",     val: `${totalKwh.toLocaleString("no")} kWh/år`,     ikon: "~" },
+    { lbl: "Est. strømkostnad",  val: `${strømkostnad.toLocaleString("no")} kr/år`,  ikon: "~" },
+  ];
+  metrikker.forEach((m, i) => {
+    const bx = 40 + colW * i;
+    side1.drawRectangle({ x: bx, y: y - 52, width: colW - 8, height: 56, color: hvit, borderRadius: 5 });
+    side1.drawRectangle({ x: bx, y: y - 52, width: colW - 8, height: 3, color: green, borderRadius: 2 });
+    side1.drawRectangle({ x: bx, y: y - 52, width: colW - 8, height: 56,
+      color: rgb(0, 0, 0), opacity: 0 }); // shadow trick
+    side1.drawText(m.lbl, { x: bx + 8, y: y - 20, size: 7.5, font: fontNormal, color: grå });
+    side1.drawText(safePDF(m.val), { x: bx + 8, y: y - 38, size: 10.5, font: fontBold, color: navy });
   });
 
-  // Tiltaksliste
-  y = height - 340;
-  side1.drawText("Anbefalte tiltak",               { x: 40, y,      size: 14, font: fontBold,   color: navy });
-  side1.drawText("Sortert etter tilbakebetalingstid", { x: 40, y: y - 18, size: 9,  font: fontNormal, color: grå });
+  y -= 70;
 
-  y -= 40;
-  // For oppgraderingsplan: tiltak er allerede brukervalgte – vis alle.
-  // For energirapport: vis kun høy-prioritet tiltak.
+  // ── Anbefalte tiltak ────────────────────────────────────────
+  seksjonHeader(side1, "Anbefalte tiltak", 40, y);
+  side1.drawText("Sortert etter tilbakebetalingstid", { x: 40, y: y - 15, size: 8, font: fontNormal, color: gråLt });
+  y -= 32;
+
   const høyPrioritet = (pakke === "oppgraderingsplan" ? tiltak : tiltak.filter(t => t.prioritet === "høy")).slice(0, 6);
   høyPrioritet.forEach((t, i) => {
     if (y < 80) return;
     const erMørk = i % 2 === 0;
-    side1.drawRectangle({ x: 40, y: y - 44, width: width - 80, height: 50, color: erMørk ? lys : hvit, borderRadius: 4 });
-    side1.drawRectangle({ x: 40, y: y - 44, width: 4, height: 50, color: green });
+    side1.drawRectangle({ x: 40, y: y - 42, width: 595 - 80, height: 46, color: erMørk ? lys : hvit, borderRadius: 4 });
+    side1.drawRectangle({ x: 40, y: y - 42, width: 3, height: 46, color: green });
 
-    side1.drawText(safePDF(t.navn),                    { x: 52, y: y - 18, size: 10, font: fontBold,   color: navy });
-    side1.drawText(safePDF(t.beskrivelse.slice(0, 70)), { x: 52, y: y - 32, size: 8,  font: fontNormal, color: grå });
+    side1.drawText(safePDF(t.navn), { x: 52, y: y - 14, size: 9.5, font: fontBold, color: navy });
+    side1.drawText(safePDF(t.beskrivelse.slice(0, 75)), { x: 52, y: y - 28, size: 7.5, font: fontNormal, color: grå });
 
-    side1.drawText(safePDF(`Enova: ${t.støtte_min/1000}-${t.støtte_max/1000}k kr`),
-      { x: width - 250, y: y - 18, size: 8, font: fontBold, color: green });
-    side1.drawText(safePDF(`Sparer: ~${t.besparelse_kr.toLocaleString("no")} kr/ar`),
-      { x: width - 250, y: y - 32, size: 8, font: fontNormal, color: grå });
-    side1.drawText(safePDF(`${t.tilbakebetaling <= 30 ? t.tilbakebetaling + " ar" : ">30 ar"} tilbakebetaling`),
-      { x: width - 130, y: y - 25, size: 8, font: fontBold, color: navy });
+    side1.drawText(safePDF(`Enova: ${t.støtte_min/1000}–${t.støtte_max/1000}k kr`),
+      { x: 595 - 255, y: y - 14, size: 8, font: fontBold, color: green });
+    side1.drawText(safePDF(`Sparer: ~${t.besparelse_kr.toLocaleString("no")} kr/år`),
+      { x: 595 - 255, y: y - 28, size: 7.5, font: fontNormal, color: grå });
 
-    y -= 58;
+    const tbTekst = t.tilbakebetaling <= 30 ? `${t.tilbakebetaling} år` : ">30 år";
+    side1.drawText(safePDF(`${tbTekst}`), { x: 595 - 110, y: y - 14, size: 8, font: fontBold, color: navy });
+    side1.drawText("tilbakebetaling", { x: 595 - 110, y: y - 27, size: 7, font: fontNormal, color: gråLt });
+
+    y -= 52;
   });
 
-  // EPBD-seksjon
+  // ── EPBD-seksjon ────────────────────────────────────────────
   if (y > 160) {
-    y -= 20;
-    side1.drawText("EPBD 2024-status", { x: 40, y, size: 12, font: fontBold, color: navy });
-    y -= 20;
+    y -= 14;
+    seksjonHeader(side1, "EPBD 2024-status", 40, y);
+    y -= 22;
     [
-      { krav: "EU-krav 2030 (merke E)",   ok: merke.merke <= "E" },
-      { krav: "EU-krav 2033 (merke D)",   ok: merke.merke <= "D" },
+      { krav: "EU-krav 2030 (merke E)",    ok: merke.merke <= "E" },
+      { krav: "EU-krav 2033 (merke D)",    ok: merke.merke <= "D" },
       { krav: "nZEB-standard (merke A/B)", ok: merke.merke <= "B" },
     ].forEach(p => {
-      side1.drawText(p.ok ? "OK" : "!", { x: 42, y, size: 10, font: fontBold, color: p.ok ? green : oransj });
-      side1.drawText(safePDF(p.krav),     { x: 58, y, size: 9,  font: fontNormal, color: navy });
+      const bgFarge = p.ok ? greenLt : oransjLt;
+      side1.drawRectangle({ x: 40, y: y - 16, width: 595 - 80, height: 20, color: bgFarge, borderRadius: 3 });
+      side1.drawText(p.ok ? "OK" : "!", { x: 48, y: y - 10, size: 9, font: fontBold, color: p.ok ? green : oransj });
+      side1.drawText(safePDF(p.krav), { x: 64, y: y - 10, size: 8.5, font: fontNormal, color: navy });
       side1.drawText(p.ok ? "Oppfylt" : "Tiltak anbefales",
-        { x: 280, y, size: 9, font: fontBold, color: p.ok ? green : oransj });
-      y -= 18;
+        { x: 595 - 160, y: y - 10, size: 8.5, font: fontBold, color: p.ok ? green : oransj });
+      y -= 24;
     });
   }
 
-  // Footer side 1
-  side1.drawRectangle({ x: 0, y: 0, width, height: 45, color: lys });
-  side1.drawText("BoligEffekt - Estimat basert pa NS-EN ISO 52000 og TEK-historikk - Ikke offisielt energimerke",
-    { x: 40, y: 16, size: 8, font: fontNormal, color: grå });
-  side1.drawText("boligeffekt.no", { x: width - 100, y: 16, size: 8, font: fontBold, color: navy });
+  footer(side1);
 
-  // ── Side 2: Oppgraderingsplan-innhold ──────────────────────
+  // ── Side 2 + 3: Oppgraderingsplan ───────────────────────────
   if (pakke === "oppgraderingsplan") {
     console.log("[PDF] Legger til side 2 (Oppgraderingsplan)");
 
     const side2 = pdfDoc.addPage([595, 842]);
+    sideHeader(side2, "Økonomianalyse og handlingsplan", 2, totSider);
 
-    // Header side 2
-    side2.drawRectangle({ x: 0, y: height - 90, width, height: 90, color: navy });
-    side2.drawText("BoligEffekt", { x: 40, y: height - 52, size: 22, font: fontBold, color: hvit });
-    side2.drawText("Oppgraderingsplan – Side 2",
-      { x: 40, y: height - 72, size: 11, font: fontNormal, color: rgb(0.7, 0.9, 0.7) });
-
-    // tiltak er allerede brukervalgte – ikke filtrer på prioritet
     const høy = tiltak;
     const totInv    = høy.reduce((s, t) => s + t.kostnad_snitt, 0);
     const totStøtte = høy.reduce((s, t) => s + t.støtte_snitt, 0);
@@ -276,62 +322,71 @@ async function lagPDF(data, pakke) {
     const bestTiltak = høy[0];
     const merkePotensial = data.resultat.merkePotensial;
 
-    let y2 = height - 110;
+    let y2 = 842 - 86;
 
-    // ── A: Økonomianalyse ─────────────────────────
-    side2.drawText("Okonomianalyse", { x: 40, y: y2, size: 13, font: fontBold, color: navy });
-    y2 -= 6;
-    side2.drawRectangle({ x: 40, y: y2 - 128, width: width - 80, height: 130, color: lys, borderRadius: 6 });
-    y2 -= 14;
+    // ── A: Økonomianalyse ──────────────────────────────────────
+    seksjonHeader(side2, "Økonomianalyse", 40, y2);
+    y2 -= 8;
 
     const okoRader = [
-      ["Total investering (alle tiltak):",       `${Math.round(totInv/1000)} 000 kr`],
-      ["Total Enova-stotte:",                    `${Math.round(totStøtte/1000)} 000 kr`],
-      ["Netto kostnad etter stotte:",            `${Math.round(netto/1000)} 000 kr`],
-      ["Estimert arsbesparelse:",                `${totBes.toLocaleString("no")} kr`],
-      ["Besparelse over 10 ar:",                 `${(totBes * 10).toLocaleString("no")} kr`],
-      ["Besparelse over 20 ar:",                 `${(totBes * 20).toLocaleString("no")} kr`],
-      ["Break-even:",                            `${breakEven} ar`],
+      ["Total investering (alle tiltak):",   `${Math.round(totInv/1000)} 000 kr`,         false],
+      ["Total Enova-støtte:",                `- ${Math.round(totStøtte/1000)} 000 kr`,     true ],
+      ["Netto kostnad etter støtte:",        `${Math.round(netto/1000)} 000 kr`,           false],
+      ["Estimert årsbesparelse:",            `${totBes.toLocaleString("no")} kr/år`,       false],
+      ["Besparelse over 10 år:",             `${(totBes * 10).toLocaleString("no")} kr`,   false],
+      ["Besparelse over 20 år:",             `${(totBes * 20).toLocaleString("no")} kr`,   false],
+      ["Break-even:",                        `${breakEven} år`,                             false],
     ];
-    okoRader.forEach(([k, v]) => {
-      side2.drawText(safePDF(k), { x: 52, y: y2, size: 9, font: fontNormal, color: grå });
-      side2.drawText(safePDF(v), { x: 350, y: y2, size: 9, font: fontBold,   color: navy });
-      y2 -= 17;
+
+    const okoH = okoRader.length * 19 + 16;
+    side2.drawRectangle({ x: 40, y: y2 - okoH, width: 595 - 80, height: okoH + 4, color: lys, borderRadius: 5 });
+    y2 -= 6;
+    okoRader.forEach(([k, v, isGreen], idx) => {
+      const rowBg = idx % 2 === 0 ? hvit : lys;
+      side2.drawRectangle({ x: 42, y: y2 - 14, width: 595 - 84, height: 18, color: rowBg });
+      side2.drawText(safePDF(k), { x: 52, y: y2 - 8, size: 8.5, font: fontNormal, color: grå });
+      side2.drawText(safePDF(v), { x: 360, y: y2 - 8, size: 9, font: fontBold,
+        color: isGreen ? green : navy });
+      y2 -= 19;
     });
+    y2 -= 16;
 
-    y2 -= 10;
-
-    // ── B: Handlingsplan ─────────────────────────
-    side2.drawText("Din handlingsplan – Start her", { x: 40, y: y2, size: 13, font: fontBold, color: navy });
+    // ── B: Handlingsplan ───────────────────────────────────────
+    seksjonHeader(side2, "Din handlingsplan – Start her", 40, y2);
     y2 -= 16;
 
     if (bestTiltak) {
-      side2.drawRectangle({ x: 40, y: y2 - 54, width: width - 80, height: 58, color: rgb(0.90, 0.97, 0.92), borderRadius: 6 });
-      side2.drawRectangle({ x: 40, y: y2 - 54, width: 4,          height: 58, color: green });
-      side2.drawText("BESTE INVESTERING NA:", { x: 52, y: y2 - 10, size: 8, font: fontBold, color: green });
+      side2.drawRectangle({ x: 40, y: y2 - 52, width: 595 - 80, height: 56, color: greenLt, borderRadius: 5 });
+      side2.drawRectangle({ x: 40, y: y2 - 52, width: 3, height: 56, color: green });
+      side2.drawText("BESTE INVESTERING NÅ", { x: 52, y: y2 - 10, size: 7.5, font: fontBold, color: green });
       side2.drawText(safePDF(bestTiltak.navn), { x: 52, y: y2 - 24, size: 11, font: fontBold, color: navy });
+      const tbStr = bestTiltak.tilbakebetaling <= 30
+        ? `${bestTiltak.tilbakebetaling} års tilbakebetaling`
+        : "Lang sikt";
       side2.drawText(
-        safePDF(`${bestTiltak.tilbakebetaling <= 30 ? bestTiltak.tilbakebetaling + " ars tilbakebetaling" : "Lang sikt"} - Enova inntil ${(bestTiltak.støtte_max/1000).toFixed(0)}k kr - Sparer ${bestTiltak.besparelse_kr.toLocaleString("no")} kr/ar`),
+        safePDF(`${tbStr} – Enova inntil ${(bestTiltak.støtte_max/1000).toFixed(0)}k kr – Sparer ${bestTiltak.besparelse_kr.toLocaleString("no")} kr/år`),
         { x: 52, y: y2 - 40, size: 8, font: fontNormal, color: grå });
       y2 -= 64;
     }
 
     høy.slice(1).forEach((t, i) => {
-      if (y2 < 200) return;
+      if (y2 < 180) return;
+      side2.drawRectangle({ x: 40, y: y2 - 20, width: 595 - 80, height: 24, color: i % 2 === 0 ? lys : hvit, borderRadius: 3 });
       side2.drawText(safePDF(`${i + 2}. ${t.navn}`),
-        { x: 52, y: y2, size: 9, font: fontBold, color: navy });
+        { x: 52, y: y2 - 13, size: 9, font: fontBold, color: navy });
+      const tbStr2 = t.tilbakebetaling <= 30 ? `${t.tilbakebetaling} år` : "Lang sikt";
       side2.drawText(
-        safePDF(`${t.tilbakebetaling <= 30 ? t.tilbakebetaling + " ar" : "Lang sikt"} tilbakebetaling - ~${t.besparelse_kr.toLocaleString("no")} kr/ar`),
-        { x: 200, y: y2, size: 8, font: fontNormal, color: grå });
-      y2 -= 16;
+        safePDF(`${tbStr2} tilbakebetaling – ~${t.besparelse_kr.toLocaleString("no")} kr/år`),
+        { x: 240, y: y2 - 13, size: 8, font: fontNormal, color: grå });
+      y2 -= 26;
     });
 
-    y2 -= 12;
+    y2 -= 14;
 
-    // ── C: Enova-søknadspakke (forkortet til én linje per tiltak) ──
-    if (y2 > 200) {
-      side2.drawText("Enova-soknadspakke", { x: 40, y: y2, size: 13, font: fontBold, color: navy });
-      side2.drawText("enova.no/privat/alle-energitiltak/", { x: 300, y: y2, size: 8, font: fontNormal, color: grå });
+    // ── C: Enova-søknadspakke ──────────────────────────────────
+    if (y2 > 180) {
+      seksjonHeader(side2, "Enova-søknadspakke", 40, y2);
+      side2.drawText("enova.no/privat/alle-energitiltak/", { x: 310, y: y2, size: 8, font: fontNormal, color: grå });
       y2 -= 16;
 
       const DOCS = {
@@ -345,77 +400,73 @@ async function lagPDF(data, pakke) {
         solceller:        "Faktura + teknisk dok. + nettilknytningsavtale",
       };
 
-      høy.forEach(t => {
-        if (y2 < 200) return;
+      høy.forEach((t, idx) => {
+        if (y2 < 180) return;
+        side2.drawRectangle({ x: 40, y: y2 - 28, width: 595 - 80, height: 32,
+          color: idx % 2 === 0 ? lys : hvit, borderRadius: 3 });
         side2.drawText(safePDF(`${t.navn} (inntil ${(t.støtte_max/1000).toFixed(0)}k kr):`),
-          { x: 52, y: y2, size: 8.5, font: fontBold, color: navy });
-        y2 -= 13;
+          { x: 52, y: y2 - 10, size: 8.5, font: fontBold, color: navy });
         side2.drawText(safePDF(DOCS[t.id] || "Faktura fra godkjent fagperson, teknisk dokumentasjon"),
-          { x: 60, y: y2, size: 8, font: fontNormal, color: grå });
-        y2 -= 16;
+          { x: 52, y: y2 - 22, size: 8, font: fontNormal, color: grå });
+        y2 -= 34;
       });
     }
 
-    // ── Footer side 2 ─────────────────────────────
-    side2.drawRectangle({ x: 0, y: 0, width, height: 45, color: lys });
-    side2.drawText("BoligEffekt - Estimat basert pa NS-EN ISO 52000 og TEK-historikk - Ikke offisielt energimerke",
-      { x: 40, y: 16, size: 8, font: fontNormal, color: grå });
-    side2.drawText("boligeffekt.no", { x: width - 100, y: 16, size: 8, font: fontBold, color: navy });
+    footer(side2);
 
-    // ── Side 3: Søknadstekst + Finansieringstips ─
+    // ── Side 3: Søknadstekst + Finansieringstips ──────────────
     const side3 = pdfDoc.addPage([595, 842]);
+    sideHeader(side3, "Søknadstekst og finansieringstips", 3, totSider);
 
-    side3.drawRectangle({ x: 0, y: height - 90, width, height: 90, color: navy });
-    side3.drawText("BoligEffekt", { x: 40, y: height - 52, size: 22, font: fontBold, color: hvit });
-    side3.drawText("Oppgraderingsplan – Side 3",
-      { x: 40, y: height - 72, size: 11, font: fontNormal, color: rgb(0.7, 0.9, 0.7) });
-
-    let y3 = height - 110;
+    let y3 = 842 - 86;
 
     // Søknadstekst
-    side3.drawText("Ferdig soknadstekst for Enova (kopier og lim inn)", { x: 40, y: y3, size: 13, font: fontBold, color: navy });
+    seksjonHeader(side3, "Ferdig søknadstekst for Enova (kopier og lim inn)", 40, y3);
     y3 -= 14;
-    side3.drawRectangle({ x: 40, y: y3 - 120, width: width - 80, height: 122, color: lys, borderRadius: 6 });
-    y3 -= 8;
 
     const kwhSpart = høy.reduce((s, t) => s + Math.round(totalKwh * t.kWh_pct), 0);
-    const søknadstekst = `Jeg soker om stotte til energitiltak i min bolig. Boligen ble bygget i perioden ${bygData.label} og har i dag estimert energimerke ${merke.merke}. Tiltakene jeg planlegger er: ${høy.map(t => t.navn).join(", ")}. Forventet energibesparelse er ca. ${kwhSpart.toLocaleString("no")} kWh per ar, noe som tilsvarer ca. ${totBes.toLocaleString("no")} kroner i reduserte stromutgifter. Tiltakene vil forbedre boligens energimerke fra ${merke.merke} til estimert ${merkePotensial ? merkePotensial.merke : "B"}.`;
+    const søknadstekst = `Jeg søker om støtte til energitiltak i min bolig. Boligen ble bygget i perioden ${bygData.label} og har i dag estimert energimerke ${merke.merke}. Tiltakene jeg planlegger å gjennomføre er: ${høy.map(t => t.navn).join(", ")}. Forventet energibesparelse er ca. ${kwhSpart.toLocaleString("no")} kWh per år, noe som tilsvarer ca. ${totBes.toLocaleString("no")} kroner i reduserte strømutgifter. Tiltakene vil forbedre boligens energimerke fra ${merke.merke} til estimert ${merkePotensial ? merkePotensial.merke : "B"}.`;
 
-    const linjer = wrapText(søknadstekst, fontNormal, 9, width - 100);
-    linjer.slice(0, 7).forEach(linje => {
+    const linjer = wrapText(søknadstekst, fontNormal, 9, 595 - 100);
+    const søkH = linjer.slice(0, 8).length * 15 + 20;
+    side3.drawRectangle({ x: 40, y: y3 - søkH, width: 595 - 80, height: søkH + 4, color: lys, borderRadius: 5 });
+    side3.drawRectangle({ x: 40, y: y3 - søkH, width: 3, height: søkH + 4, color: navy });
+    y3 -= 8;
+    linjer.slice(0, 8).forEach(linje => {
       side3.drawText(safePDF(linje), { x: 52, y: y3, size: 9, font: fontNormal, color: navy });
-      y3 -= 14;
+      y3 -= 15;
     });
 
-    y3 -= 20;
+    y3 -= 24;
 
     // Finansieringstips
-    side3.drawText("Finansieringstips", { x: 40, y: y3, size: 13, font: fontBold, color: navy });
-    y3 -= 16;
+    seksjonHeader(side3, "Finansieringstips", 40, y3);
+    y3 -= 18;
 
     const tips = [
-      ["Gront boliglan:", "Mange banker tilbyr lavere rente ved oppgradering til energimerke A eller B. Spar 0,2-0,5 % poeng i rente."],
-      ["Husbanken gront lan:", "Gunstig finansiering for energioppgradering av eldre boliger. Se husbanken.no."],
-      ["Kombiner tiltak:", "Bestill flere tiltak hos samme handverker – reduser riggkostnader og fa bedre totalpris."],
-      ["Tips:", "Sok Enova-stotte for du bestiller handverkere. Enova krever at soknaden er godkjent pa forhand."],
+      ["Grønt boliglån", "Mange banker tilbyr lavere rente ved oppgradering til energimerke A eller B. Spar 0,2–0,5 prosentpoeng."],
+      ["Husbanken grønt lån", "Gunstig finansiering for energioppgradering av eldre boliger. Se husbanken.no."],
+      ["Kombiner tiltak", "Bestill flere tiltak hos samme håndverker – reduser riggkostnader og få bedre totalpris."],
+      ["Viktig", "Søk Enova-støtte før du bestiller håndverkere. Enova krever at søknaden er godkjent på forhånd."],
     ];
 
-    tips.forEach(([tittel, tekst]) => {
-      if (y3 < 80) return;
-      side3.drawRectangle({ x: 40, y: y3 - 36, width: width - 80, height: 40, color: lys, borderRadius: 4 });
-      side3.drawText(safePDF(tittel), { x: 52, y: y3 - 10, size: 9, font: fontBold,   color: navy });
-      const tipsLinjer = wrapText(tekst, fontNormal, 8.5, width - 140);
+    tips.forEach(([tittel, tekst], idx) => {
+      if (y3 < 60) return;
+      const tipH = 44;
+      side3.drawRectangle({ x: 40, y: y3 - tipH, width: 595 - 80, height: tipH + 4,
+        color: idx % 2 === 0 ? lys : hvit, borderRadius: 4 });
+      side3.drawRectangle({ x: 40, y: y3 - tipH, width: 3, height: tipH + 4,
+        color: idx === 3 ? oransj : green });
+      side3.drawText(safePDF(tittel), { x: 52, y: y3 - 10, size: 9.5, font: fontBold,
+        color: idx === 3 ? oransj : navy });
+      const tipsLinjer = wrapText(tekst, fontNormal, 8.5, 595 - 130);
       tipsLinjer.slice(0, 2).forEach((l, li) => {
-        side3.drawText(safePDF(l), { x: 52, y: y3 - 24 - li * 12, size: 8.5, font: fontNormal, color: grå });
+        side3.drawText(safePDF(l), { x: 52, y: y3 - 24 - li * 13, size: 8.5, font: fontNormal, color: grå });
       });
-      y3 -= 50;
+      y3 -= tipH + 10;
     });
 
-    // Footer side 3
-    side3.drawRectangle({ x: 0, y: 0, width, height: 45, color: lys });
-    side3.drawText("BoligEffekt - Estimat basert pa NS-EN ISO 52000 og TEK-historikk - Ikke offisielt energimerke",
-      { x: 40, y: 16, size: 8, font: fontNormal, color: grå });
-    side3.drawText("boligeffekt.no", { x: width - 100, y: 16, size: 8, font: fontBold, color: navy });
+    footer(side3);
   }
 
   const bytes = await pdfDoc.save();
@@ -433,7 +484,7 @@ async function sendEpost(epostAdresse, pdfBytes, data) {
   const result = await resend.emails.send({
     from: FROM_EMAIL,
     to: epostAdresse,
-    subject: `Din energirapport - Merke ${merke.merke} (${kwhPerM2} kWh/m2/ar)`,
+    subject: `Din energirapport - Merke ${merke.merke} (${kwhPerM2} kWh/m²/år)`,
     html: `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f0ede8;padding:0 0 32px">
         <div style="background:#1b3a5c;padding:28px 32px">
@@ -490,7 +541,7 @@ async function sendEpostOppgradering(epostAdresse, pdfBytes, data) {
   const result = await resend.emails.send({
     from: FROM_EMAIL,
     to: epostAdresse,
-    subject: `Din Oppgraderingsplan - Merke ${merke.merke} til ${merkePotensial ? merkePotensial.merke : "B"} (${kwhPerM2} kWh/m2/ar)`,
+    subject: `Din Oppgraderingsplan - Merke ${merke.merke} til ${merkePotensial ? merkePotensial.merke : "B"} (${kwhPerM2} kWh/m²/år)`,
     html: `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f0ede8;padding:0 0 32px">
         <div style="background:#1b3a5c;padding:28px 32px">
