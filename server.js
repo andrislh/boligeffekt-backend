@@ -107,6 +107,10 @@ function safePDF(str) {
     .replace(/\u2192/g, "->")                  // → -> ->
     .replace(/\u2190/g, "<-")                  // ← -> <-
     .replace(/\u2022/g, "-")                   // • -> -
+    .replace(/\u2264/g, "<=")                  // ≤ -> <=
+    .replace(/\u2265/g, ">=")                  // ≥ -> >=
+    .replace(/\u2013/g, "-")                   // – (en-dash) -> -
+    .replace(/\u2014/g, "-")                   // — (em-dash) -> -
     .replace(/[^\x00-\xFF]/g, "");             // Alt utenfor Latin-1 fjernes
 }
 
