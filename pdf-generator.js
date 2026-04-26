@@ -140,25 +140,15 @@ function drawEnergimerkeSkala(side, x, y, width, fraMerke, tilMerke, fontBold) {
   }
 }
 
+// Trekant-markører via SVG-path (presis, ikke pikselert som rektangel-stack)
 function drawTriangleDown(side, cx, cy, size, color) {
-  // Tegnet som tre tynne rektangler — ikke perfekt, men fungerer uten SVG
-  for (let i = 0; i < size; i++) {
-    side.drawRectangle({
-      x: cx - (size - i), y: cy - i,
-      width: 2 * (size - i), height: 1,
-      color,
-    });
-  }
+  const path = `M ${cx - size} ${cy + size} L ${cx + size} ${cy + size} L ${cx} ${cy - size} Z`;
+  side.drawSvgPath(path, { color, borderColor: color, borderWidth: 0 });
 }
 
 function drawTriangleUp(side, cx, cy, size, color) {
-  for (let i = 0; i < size; i++) {
-    side.drawRectangle({
-      x: cx - i, y: cy + i,
-      width: 2 * i + 1, height: 1,
-      color,
-    });
-  }
+  const path = `M ${cx - size} ${cy - size} L ${cx + size} ${cy - size} L ${cx} ${cy + size} Z`;
+  side.drawSvgPath(path, { color, borderColor: color, borderWidth: 0 });
 }
 
 // Stablet horisontal stolpe — varmetapsfordeling
