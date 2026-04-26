@@ -144,15 +144,25 @@ const mockData = {
   const doc = await PDFDocument.load(bytes);
   assert(`PDF har 10 sider (${doc.getPageCount()})`, doc.getPageCount() === 10);
 
-  // 5. Lagre sample
+  // 5. Lagre sample (hopp over hvis filen er låst av PDF-viewer)
   const samplesDir = path.join(__dirname, "samples");
   if (!fs.existsSync(samplesDir)) fs.mkdirSync(samplesDir, { recursive: true });
   const samplePath = path.join(samplesDir, "test-rapport-overhaul.pdf");
-  fs.writeFileSync(samplePath, Buffer.from(bytes));
-  console.log(`\n  PDF lagret: ${samplePath}`);
+  try {
+    fs.writeFileSync(samplePath, Buffer.from(bytes));
+    console.log(`\n  PDF lagret: ${samplePath}`);
+  } catch (e) {
+    if (e.code === "EBUSY") {
+      console.log(`\n  (sample låst av viewer — hoppes over)`);
+    } else { throw e; }
+  }
 
-  // Også lokal kopi for visuell inspeksjon
-  fs.writeFileSync(path.join(__dirname, "test-output.pdf"), Buffer.from(bytes));
+  // Lokal kopi for visuell inspeksjon — også med fallback
+  try {
+    fs.writeFileSync(path.join(__dirname, "test-output.pdf"), Buffer.from(bytes));
+  } catch (e) {
+    if (e.code !== "EBUSY") throw e;
+  }
 
   console.log(`\n=== ${assertionsRun - assertionsFailed}/${assertionsRun} OK ===\n`);
   if (assertionsFailed > 0) process.exit(1);

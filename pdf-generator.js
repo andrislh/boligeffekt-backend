@@ -188,38 +188,48 @@ function drawVarmetapsfordeling(side, x, y, width, segments, fontNormal, fontBol
 }
 
 // Tidslinje — år 0-10 med tiltak markert
-function drawTidslinje(side, x, y, width, tiltakMedTidspunkt, fontNormal, fontBold) {
-  // Akse
-  side.drawRectangle({
-    x, y, width, height: 1.5,
-    color: COLORS.textSecondary,
+// Tidslinje-arealets dimensjoner
+const TIDSLINJE_RADER = 4;
+const TIDSLINJE_RAD_H = 16;
+const TIDSLINJE_HØYDE = TIDSLINJE_RADER * TIDSLINJE_RAD_H + 30;  // ~94px (tiltak + akse + labels)
+
+// Tegner tidslinje. yTopp = ØVERSTE punkt for arealet — funksjonen tegner 100px nedover.
+// Tiltak plasseres i 4 rader OVER aksen, aksen + årmerker nederst.
+function drawTidslinje(side, x, yTopp, width, tiltakMedTidspunkt, fontNormal, fontBold) {
+  const blokkH = 12;
+  const akseY  = yTopp - TIDSLINJE_RADER * TIDSLINJE_RAD_H - 6;
+
+  // Tiltak-blokker (rad 0 øverst, rad 3 rett over aksen)
+  tiltakMedTidspunkt.forEach((t, i) => {
+    const px = x + (t.startÅr / 10) * width;
+    const w  = Math.max(((t.varighet || 0.3) / 10) * width, 4);
+    const rad = i % TIDSLINJE_RADER;
+    const blockY = yTopp - rad * TIDSLINJE_RAD_H - blokkH - 2;
+    const c = t.kategori === "egenfinansiert" ? COLORS.egenfin : COLORS.enova;
+    side.drawRectangle({
+      x: px, y: blockY, width: w, height: blokkH,
+      color: c, borderRadius: 2,
+    });
+    side.drawText(safePDF(t.navn.slice(0, 26)), {
+      x: px + w + 4, y: blockY + 3,
+      size: 7, font: fontBold, color: COLORS.textPrimary,
+    });
   });
-  // Årmerker
+
+  // Akse nederst
+  side.drawRectangle({ x, y: akseY, width, height: 1.5, color: COLORS.textSecondary });
+
+  // Årmerker (tick + label under aksen)
   for (let år = 0; år <= 10; år++) {
     const px = x + (år / 10) * width;
-    side.drawRectangle({ x: px - 0.5, y: y - 4, width: 1, height: 8, color: COLORS.textSecondary });
+    side.drawRectangle({ x: px - 0.5, y: akseY - 4, width: 1, height: 8, color: COLORS.textSecondary });
     if (år % 2 === 0) {
       side.drawText(`År ${år}`, {
-        x: px - 10, y: y - 16,
+        x: px - 10, y: akseY - 16,
         size: 7, font: fontNormal, color: COLORS.textSecondary,
       });
     }
   }
-  // Tiltak
-  tiltakMedTidspunkt.forEach((t, i) => {
-    const px = x + (t.startÅr / 10) * width;
-    const w  = Math.max(((t.varighet || 0.3) / 10) * width, 4);
-    const blockY = y + 12 + (i % 4) * 26;
-    const c = t.kategori === "egenfinansiert" ? COLORS.egenfin : COLORS.enova;
-    side.drawRectangle({
-      x: px, y: blockY, width: w, height: 14,
-      color: c, borderRadius: 2,
-    });
-    side.drawText(safePDF(t.navn.slice(0, 28)), {
-      x: px + w + 4, y: blockY + 4,
-      size: 7.5, font: fontBold, color: COLORS.textPrimary,
-    });
-  });
 }
 
 // Liten payback-graf — kumulativ besparelse vs investering
@@ -519,8 +529,8 @@ async function lagPDF(data, pakke) {
     ...fase2.map((t, i) => ({ navn: t.navn, startÅr: 3 + i * 0.7, varighet: 0.6, kategori: t.kategori })),
     ...fase3.map((t, i) => ({ navn: t.navn, startÅr: 5 + i * 0.7, varighet: 0.6, kategori: t.kategori })),
   ];
-  drawTidslinje(side3, 40, y3 - 8, LAYOUT.contentWidth, tidslinjeTiltak, fontNormal, fontBold);
-  y3 -= 220;
+  drawTidslinje(side3, 40, y3, LAYOUT.contentWidth, tidslinjeTiltak, fontNormal, fontBold);
+  y3 -= TIDSLINJE_HØYDE + 16;
 
   // Forklaring per fase
   const fasebeskrivelser = [
