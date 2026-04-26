@@ -318,8 +318,10 @@ async function lagPDF(data, pakke) {
     sideHeader(side2, "Økonomianalyse og handlingsplan", 2, totSider);
 
     const høy = tiltak;
+    // Konsistent med enkelt-rader som viser "inntil støtte_max":
+    // bruker støtte_max på totalen slik at sum av enkelt-tiltak matcher total.
     const totInv    = høy.reduce((s, t) => s + t.kostnad_snitt, 0);
-    const totStøtte = høy.reduce((s, t) => s + t.støtte_snitt, 0);
+    const totStøtte = høy.reduce((s, t) => s + t.støtte_max, 0);
     const netto     = totInv - totStøtte;
     const totBes    = høy.reduce((s, t) => s + t.besparelse_kr, 0);
     const breakEven = totBes > 0 ? Math.round(netto / totBes) : 99;
@@ -333,9 +335,9 @@ async function lagPDF(data, pakke) {
     y2 -= 8;
 
     const okoRader = [
-      ["Total investering (alle tiltak):",   `${Math.round(totInv/1000)} 000 kr`,         false],
-      ["Total Enova-støtte:",                `- ${Math.round(totStøtte/1000)} 000 kr`,     true ],
-      ["Netto kostnad etter støtte:",        `${Math.round(netto/1000)} 000 kr`,           false],
+      ["Total investering (alle tiltak):",   `${totInv.toLocaleString("no")} kr`,          false],
+      ["Mulig Enova-støtte (inntil):",       `- ${totStøtte.toLocaleString("no")} kr`,     true ],
+      ["Netto kostnad etter støtte:",        `${netto.toLocaleString("no")} kr`,           false],
       ["Estimert årsbesparelse:",            `${totBes.toLocaleString("no")} kr/år`,       false],
       ["Besparelse over 10 år:",             `${(totBes * 10).toLocaleString("no")} kr`,   false],
       ["Besparelse over 20 år:",             `${(totBes * 20).toLocaleString("no")} kr`,   false],
@@ -483,7 +485,8 @@ async function sendEpost(epostAdresse, pdfBytes, data) {
   console.log("[E-POST] Sender Energirapport til:", epostAdresse);
   console.log("[E-POST] Fra:", FROM_EMAIL);
   const { merke, kwhPerM2, tiltak } = data.resultat;
-  const totalStøtte = tiltak.filter(t => t.prioritet === "høy").reduce((s, t) => s + t.støtte_snitt, 0);
+  // Bruker støtte_max for konsistens med "inntil X kr"-visning per tiltak
+  const totalStøtte = tiltak.filter(t => t.prioritet === "høy").reduce((s, t) => s + t.støtte_max, 0);
 
   const result = await resend.emails.send({
     from: FROM_EMAIL,
@@ -533,7 +536,8 @@ async function sendEpostOppgradering(epostAdresse, pdfBytes, data) {
   // tiltak er allerede brukervalgte tiltak fra den interaktive flyten – ikke filtrer på prioritet
   const høy       = tiltak;
   const totInv    = høy.reduce((s, t) => s + t.kostnad_snitt, 0);
-  const totStøtte = høy.reduce((s, t) => s + t.støtte_snitt, 0);
+  // Bruker støtte_max for konsistens med "inntil X kr"-visning per tiltak
+  const totStøtte = høy.reduce((s, t) => s + t.støtte_max, 0);
   const netto     = totInv - totStøtte;
   const totBes    = høy.reduce((s, t) => s + t.besparelse_kr, 0);
   const breakEven = totBes > 0 ? Math.round(netto / totBes) : "–";
@@ -567,9 +571,9 @@ async function sendEpostOppgradering(epostAdresse, pdfBytes, data) {
             <h2 style="color:#1b3a5c;margin:0 0 12px;font-size:16px">Økonomianalyse</h2>
             <table style="width:100%;border-collapse:collapse">
               ${[
-                ["Total investering",         `${Math.round(totInv/1000)} 000 kr`],
-                ["Total Enova-støtte",         `${Math.round(totStøtte/1000)} 000 kr`],
-                ["Netto kostnad etter støtte", `${Math.round(netto/1000)} 000 kr`],
+                ["Total investering",          `${totInv.toLocaleString("no")} kr`],
+                ["Mulig Enova-støtte (inntil)", `${totStøtte.toLocaleString("no")} kr`],
+                ["Netto kostnad etter støtte", `${netto.toLocaleString("no")} kr`],
                 ["Estimert årsbesparelse",    `${totBes.toLocaleString("no")} kr`],
                 ["Besparelse over 10 år",     `${(totBes*10).toLocaleString("no")} kr`],
                 ["Break-even",                `${breakEven} år`],
