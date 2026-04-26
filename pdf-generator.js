@@ -100,20 +100,26 @@ function fmtKrÅr(n) { return Math.round(n).toLocaleString("no") + " kr/år"; }
 // VISUELLE ELEMENTER
 // ─────────────────────────────────────────────────────────────
 
-// Energimerke-skala A→G med markør for dagens og ev. fremtidig merke
+// Energimerke-skala A→G med markør for dagens og ev. fremtidig merke.
+// Større segmenter (32px høy, ikke 22) — gir mer visuell vekt på forsiden,
+// støtter pdf-skalaens rolle som hovud-visualisering (UI/UX visual hierarchy).
+const ENERGIMERKE_SKALA_HØYDE = 32;
+
 function drawEnergimerkeSkala(side, x, y, width, fraMerke, tilMerke, fontBold) {
   const segW = width / 7;
-  const segH = 22;
+  const segH = ENERGIMERKE_SKALA_HØYDE;
   const merker = ["A","B","C","D","E","F","G"];
 
   merker.forEach((m, i) => {
     side.drawRectangle({
-      x: x + i * segW, y, width: segW - 1, height: segH,
+      x: x + i * segW, y, width: segW - 1.5, height: segH,
       color: GRADE_COLORS[m],
     });
+    // Større, sentrert bokstav (15pt vs 11pt)
+    const txtW = fontBold.widthOfTextAtSize(m, 15);
     side.drawText(m, {
-      x: x + i * segW + segW / 2 - 3, y: y + segH / 2 - 4,
-      size: 11, font: fontBold, color: COLORS.card,
+      x: x + i * segW + (segW - txtW) / 2, y: y + segH / 2 - 5,
+      size: 15, font: fontBold, color: COLORS.card,
     });
   });
 
@@ -123,19 +129,22 @@ function drawEnergimerkeSkala(side, x, y, width, fraMerke, tilMerke, fontBold) {
 
   if (fraIdx >= 0) {
     const cx = x + fraIdx * segW + segW / 2;
-    // Mørk trekant peker ned, over baren
-    drawTriangleDown(side, cx, y + segH + 8, 8, COLORS.primaryDark);
-    side.drawText(safePDF("I dag: " + fraMerke), {
-      x: cx - 22, y: y + segH + 14,
-      size: 8, font: fontBold, color: COLORS.primaryDark,
+    drawTriangleDown(side, cx, y + segH + 10, 7, COLORS.primaryDark);
+    const lbl = safePDF("I dag: " + fraMerke);
+    const lblW = fontBold.widthOfTextAtSize(lbl, 9);
+    side.drawText(lbl, {
+      x: cx - lblW / 2, y: y + segH + 22,
+      size: 9, font: fontBold, color: COLORS.primaryDark,
     });
   }
   if (tilIdx >= 0 && tilIdx !== fraIdx) {
     const cx = x + tilIdx * segW + segW / 2;
-    drawTriangleUp(side, cx, y - 8, 8, COLORS.enova);
-    side.drawText(safePDF("Etter tiltak: " + tilMerke), {
-      x: cx - 32, y: y - 22,
-      size: 8, font: fontBold, color: COLORS.enova,
+    drawTriangleUp(side, cx, y - 10, 7, COLORS.enova);
+    const lbl = safePDF("Etter tiltak: " + tilMerke);
+    const lblW = fontBold.widthOfTextAtSize(lbl, 9);
+    side.drawText(lbl, {
+      x: cx - lblW / 2, y: y - 24,
+      size: 9, font: fontBold, color: COLORS.enova,
     });
   }
 }
@@ -172,18 +181,29 @@ function drawVarmetapsfordeling(side, x, y, width, segments, fontNormal, fontBol
     cursorX += w;
   });
 
-  // Legende under stolpen
+  // Legende under stolpen — wrap til ny linje hvis bredden overskrides
+  // (skill §10: legend-visible — sørger for at alle labels vises uten avkutting)
+  const legendItemGap = 18;   // ekstra gap mellom items
+  const swatchW = 9;
+  const legendY0 = y - 18;
   let legX = x;
+  let legY = legendY0;
   segments.forEach((seg) => {
+    const labelW = fontNormal.widthOfTextAtSize(safePDF(seg.label), 8);
+    const itemW  = swatchW + 5 + labelW + legendItemGap;
+    if (legX + itemW > x + width) {
+      legX = x;
+      legY -= 14;
+    }
     side.drawRectangle({
-      x: legX, y: y - 18, width: 8, height: 8,
+      x: legX, y: legY, width: swatchW, height: 9,
       color: seg.color || COLORS.primary,
     });
     side.drawText(safePDF(seg.label), {
-      x: legX + 12, y: y - 16,
-      size: 7.5, font: fontNormal, color: COLORS.textSecondary,
+      x: legX + swatchW + 5, y: legY + 1,
+      size: 8, font: fontNormal, color: COLORS.textSecondary,
     });
-    legX += 4 + 8 + 4 + (fontNormal.widthOfTextAtSize(safePDF(seg.label), 7.5) + 14);
+    legX += itemW;
   });
 }
 
@@ -232,53 +252,68 @@ function drawTidslinje(side, x, yTopp, width, tiltakMedTidspunkt, fontNormal, fo
   }
 }
 
-// Liten payback-graf — kumulativ besparelse vs investering
-function drawPaybackGraf(side, x, y, w, h, kostnad, besparelseÅrlig, fontNormal) {
+// Liten payback-graf — kumulativ besparelse vs investering.
+// (skill §10: chart axis-labels + direct-labeling — krysspunktet markeres
+// tydelig og hovedlinjene har tekstetiketter direkte ved linjen)
+function drawPaybackGraf(side, x, y, w, h, kostnad, besparelseÅrlig, fontNormal, fontBold) {
   if (besparelseÅrlig <= 0) return;
   const år = 10;
-  const maxVerdi = Math.max(kostnad, besparelseÅrlig * år);
+  const maxVerdi = Math.max(kostnad, besparelseÅrlig * år) * 1.05;  // headroom over linjen
   const yScale = h / maxVerdi;
   const xScale = w / år;
 
-  // Akser
-  side.drawRectangle({ x, y, width: 1, height: h, color: COLORS.textSecondary });
-  side.drawRectangle({ x, y, width: w, height: 1, color: COLORS.textSecondary });
+  // Bakgrunn med subtil bunnramme (rolig "card"-følelse for grafen)
+  side.drawRectangle({ x: x - 2, y: y - 2, width: w + 4, height: h + 4, color: COLORS.background, borderRadius: 2 });
 
-  // Investeringslinje (horisontal)
+  // Akser
+  side.drawRectangle({ x, y, width: 0.8, height: h, color: COLORS.textMuted });
+  side.drawRectangle({ x, y, width: w, height: 0.8, color: COLORS.textMuted });
+
+  // Investeringslinje (stiplet horisontal)
   const invY = y + kostnad * yScale;
   for (let i = 0; i < w; i += 4) {
     side.drawRectangle({ x: x + i, y: invY, width: 2, height: 0.8, color: COLORS.egenfin });
   }
-  side.drawText(`Investering: ${fmtKr(kostnad)}`, {
-    x: x + 4, y: invY + 3, size: 6, font: fontNormal, color: COLORS.egenfin,
+  side.drawText(`Investering ${fmtKr(kostnad)}`, {
+    x: x + 4, y: invY + 3, size: 6.5, font: fontBold, color: COLORS.egenfin,
   });
 
-  // Besparelseskurve (lineær for enkelhet)
+  // Besparelseskurve (kumulativ, lineær)
   for (let år1 = 1; år1 <= år; år1++) {
     const px1 = x + (år1 - 1) * xScale;
     const py1 = y + (besparelseÅrlig * (år1 - 1)) * yScale;
     const px2 = x + år1 * xScale;
     const py2 = y + (besparelseÅrlig * år1) * yScale;
-    // Tegn linjesegment som tynt rektangel langs hypotenusen — forenkling
     const dx = px2 - px1, dy = py2 - py1;
     const steg = Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)));
     for (let s = 0; s < steg; s++) {
       side.drawRectangle({
         x: px1 + (dx * s / steg), y: py1 + (dy * s / steg),
-        width: 1.2, height: 1.2, color: COLORS.enova,
+        width: 1.4, height: 1.4, color: COLORS.enova,
       });
     }
   }
-  // Krysspunkt-marker
+
+  // Krysspunkt-marker (payback-tidspunkt)
   const paybackÅr = kostnad / besparelseÅrlig;
   if (paybackÅr <= år) {
     const cx = x + paybackÅr * xScale;
     const cy = y + kostnad * yScale;
-    side.drawRectangle({ x: cx - 3, y: cy - 3, width: 6, height: 6, color: COLORS.accent });
+    // Outer ring + inner dot for tydelighet
+    side.drawRectangle({ x: cx - 4, y: cy - 4, width: 8, height: 8, color: COLORS.accent, borderRadius: 4 });
+    side.drawRectangle({ x: cx - 1.5, y: cy - 1.5, width: 3, height: 3, color: COLORS.card, borderRadius: 1.5 });
+    // Etikett under krysspunktet
+    const lbl = `Payback: ${paybackÅr.toFixed(1)} år`;
+    side.drawText(lbl, {
+      x: cx - fontBold.widthOfTextAtSize(lbl, 7) / 2,
+      y: y - 10,
+      size: 7, font: fontBold, color: COLORS.accent,
+    });
   }
 
+  // Akse-endepunkts-etikett (10 år)
   side.drawText(`${år} år`, {
-    x: x + w - 14, y: y - 9, size: 6, font: fontNormal, color: COLORS.textSecondary,
+    x: x + w - 12, y: y - 10, size: 6.5, font: fontNormal, color: COLORS.textMuted,
   });
 }
 
@@ -378,13 +413,13 @@ async function lagPDF(data, pakke) {
 
   // Energimerke-skala (dagens → fremtidig)
   seksjonHeader(side1, "Estimert energimerke", 40, y, fontBold);
-  y -= 36;
+  y -= 44;  // ekstra rom for "Etter tiltak"-label over skalaen
   drawEnergimerkeSkala(
     side1, 40, y, LAYOUT.contentWidth,
     merke?.merke, merkePotensial?.merke,
     fontBold,
   );
-  y -= 56;
+  y -= ENERGIMERKE_SKALA_HØYDE + 38;  // skala + plass til "I dag"-label under
 
   // Tre nøkkeltall
   seksjonHeader(side1, "Potensial", 40, y, fontBold);
@@ -651,7 +686,7 @@ async function lagPDF(data, pakke) {
       });
 
       // Liten payback-graf til høyre
-      drawPaybackGraf(sd, 380, yd - 60, 165, 60, t.kostnad_snitt || 0, t.besparelse_kr || 0, fontNormal);
+      drawPaybackGraf(sd, 380, yd - 60, 165, 60, t.kostnad_snitt || 0, t.besparelse_kr || 0, fontNormal, fontBold);
 
       yd -= 96;
 
