@@ -616,16 +616,62 @@ async function lagPDF(data, pakke) {
   });
   y2 -= 60;
 
-  // EPBD-kobling
-  seksjonHeader(side2, "EU-direktivet (EPBD 2024)", 40, y2, fontBold);
+  // EPBD-kobling - forventede EU-krav (ikke vedtatt)
+  seksjonHeader(side2, "EU-direktivet (EPBD 2024) - forventede krav", 40, y2, fontBold);
   y2 -= 18;
-  side2.drawText(safePDF("EU-krav 2030: Alle boliger må ha minst merke E"), {
-    x: 40, y: y2, size: 9, font: fontBold, color: COLORS.primary,
+  side2.drawText(safePDF("Norsk implementering er ikke endelig vedtatt. Tallene under er forventet retning."), {
+    x: 40, y: y2, size: 8, font: fontNormal, color: COLORS.textMuted,
   });
-  y2 -= 14;
-  side2.drawText(safePDF(`Ditt nåværende merke: ${merke?.merke || "-"}.  Med anbefalt tiltakssett: ${merkePotensial?.merke || "-"}.`), {
-    x: 40, y: y2, size: 8.5, font: fontNormal, color: COLORS.textSecondary,
+  y2 -= 18;
+
+  const epbdMerker = ["A","B","C","D","E","F","G"];
+  const idxDagens  = epbdMerker.indexOf(merke?.merke || "G");
+  const idxNytt    = epbdMerker.indexOf(merkePotensial?.merke || "C");
+  const grense2030 = epbdMerker.indexOf("E");
+  const grense2033 = epbdMerker.indexOf("D");
+
+  const epbdRader = [
+    { år: "2025", lbl: "I dag",                kravMerke: merke?.merke || "-", status: "Naverende",
+      farge: COLORS.textSecondary },
+    { år: "2030", lbl: "Forventet EU-krav",    kravMerke: "E",
+      status: idxDagens <= grense2030 ? "Oppfyller" : "Ma oppgraderes",
+      farge:  idxDagens <= grense2030 ? COLORS.enova : COLORS.accent },
+    { år: "2033", lbl: "Forventet skjerping",  kravMerke: "D",
+      status: idxDagens <= grense2033 ? "Oppfyller" : "Ma oppgraderes",
+      farge:  idxDagens <= grense2033 ? COLORS.enova : COLORS.accent },
+  ];
+
+  epbdRader.forEach((r, i) => {
+    const rowY = y2 - i * 22;
+    side2.drawRectangle({
+      x: 40, y: rowY - 6, width: LAYOUT.contentWidth, height: 20,
+      color: i % 2 === 0 ? COLORS.background : COLORS.card,
+    });
+    side2.drawText(safePDF(r.år), { x: 50, y: rowY, size: 9, font: fontBold, color: COLORS.primary });
+    side2.drawText(safePDF(r.lbl), { x: 100, y: rowY, size: 8.5, font: fontNormal, color: COLORS.textSecondary });
+    side2.drawText(safePDF(`Merke ${r.kravMerke}`), { x: 270, y: rowY, size: 9, font: fontBold, color: COLORS.textPrimary });
+    side2.drawText(safePDF(r.status), { x: 420, y: rowY, size: 9, font: fontBold, color: r.farge });
   });
+  y2 -= epbdRader.length * 22 + 6;
+
+  // Etter-tiltak-konklusjon
+  if (idxNytt < idxDagens) {
+    const oppfyller2030 = idxNytt <= grense2030;
+    const oppfyller2033 = idxNytt <= grense2033;
+    const konklusjon = oppfyller2030 && oppfyller2033
+      ? `Med anbefalte tiltak (nytt merke ${merkePotensial?.merke}): oppfyller bade 2030- og 2033-kravene.`
+      : oppfyller2030
+        ? `Med anbefalte tiltak (nytt merke ${merkePotensial?.merke}): oppfyller 2030-kravet, ligger naer 2033-grensen.`
+        : `Med anbefalte tiltak (nytt merke ${merkePotensial?.merke}): oppfyller ikke fullt ut 2030-kravet - vurder flere tiltak.`;
+    side2.drawRectangle({
+      x: 40, y: y2 - 22, width: LAYOUT.contentWidth, height: 22,
+      color: COLORS.enovaLight,
+    });
+    side2.drawRectangle({ x: 40, y: y2 - 22, width: 3, height: 22, color: COLORS.enova });
+    wrapText(konklusjon, fontNormal, 8.5, LAYOUT.contentWidth - 20).slice(0, 2).forEach((l, li) => {
+      side2.drawText(safePDF(l), { x: 50, y: y2 - 8 - li * 11, size: 8.5, font: fontBold, color: COLORS.primary });
+    });
+  }
 
   footer(side2, fontNormal, fontBold);
 
