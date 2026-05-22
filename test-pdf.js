@@ -30,6 +30,7 @@ function assert(label, ok, detail = "") {
 
 // Mock-data: bolig 1987-1997, merke G, ~100 m² (matcher spec'en)
 const mockData = {
+  input: { adresse: "Storgata 1, 0001 Oslo" },
   resultat: {
     merke:           { merke: "G", epbd: "Svært dårlig", farge: "#9e1a20", tekst: "#fff" },
     merkePotensial:  { merke: "C" },
@@ -140,9 +141,9 @@ const mockData = {
   const sizeKb = (bytes.length / 1024).toFixed(1);
   assert(`PDF generert (${sizeKb} KB)`, bytes.length > 5000);
 
-  // Verifiser side-telling med pdf-lib
+  // Verifiser side-telling med pdf-lib (1 forside + 10 nummererte sider)
   const doc = await PDFDocument.load(bytes);
-  assert(`PDF har 10 sider (${doc.getPageCount()})`, doc.getPageCount() === 10);
+  assert(`PDF har 11 sider, forside + 10 (${doc.getPageCount()})`, doc.getPageCount() === 11);
 
   // 5. Lagre sample (hopp over hvis filen er låst av PDF-viewer)
   const samplesDir = path.join(__dirname, "samples");

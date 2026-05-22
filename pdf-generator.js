@@ -353,6 +353,98 @@ function seksjonHeader(side, tekst, x, y, fontBold) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// FORSIDE (cover page)
+// ─────────────────────────────────────────────────────────────
+// Ren, profesjonell forside. Logo som tekst-wordmark (pdf-lib krasjer
+// på emoji, og vi vil ikke embedde PNG fra disk for å holde det lett).
+function tegnForside(pdfDoc, data, fontNormal, fontBold) {
+  const side = pdfDoc.addPage([LAYOUT.pageWidth, LAYOUT.pageHeight]);
+  const adresse = (data && data.input && typeof data.input.adresse === "string")
+    ? data.input.adresse.trim()
+    : "";
+  const dato = new Date().toLocaleDateString("nb-NO", { day: "2-digit", month: "long", year: "numeric" });
+
+  // Navy hero-bånd øverst (samme palette som rapportsidene)
+  side.drawRectangle({
+    x: 0, y: LAYOUT.pageHeight - 180,
+    width: LAYOUT.pageWidth, height: 180,
+    color: COLORS.primary,
+  });
+  // Tynn grønn aksent-strek under båndet
+  side.drawRectangle({
+    x: 0, y: LAYOUT.pageHeight - 184,
+    width: LAYOUT.pageWidth, height: 4,
+    color: COLORS.enova,
+  });
+
+  // Logo som wordmark
+  side.drawText("BoligEffekt", {
+    x: LAYOUT.marginX, y: LAYOUT.pageHeight - 110,
+    size: 36, font: fontBold, color: COLORS.card,
+  });
+  side.drawText(safePDF("Estimat basert pa NS-EN ISO 52000 og TEK-historikk"), {
+    x: LAYOUT.marginX, y: LAYOUT.pageHeight - 135,
+    size: 10, font: fontNormal, color: rgb(0.78, 0.88, 0.78),
+  });
+
+  // Tittel
+  const titteY = LAYOUT.pageHeight - 280;
+  side.drawText(safePDF("Energivurdering"), {
+    x: LAYOUT.marginX, y: titteY,
+    size: 40, font: fontBold, color: COLORS.primaryDark,
+  });
+  // Aksent-linje under tittel
+  side.drawRectangle({
+    x: LAYOUT.marginX, y: titteY - 14,
+    width: 80, height: 3, color: COLORS.enova,
+  });
+
+  // Adresse (utelat hvis tom)
+  let metaY = titteY - 70;
+  if (adresse) {
+    const adresseLinjer = wrapText(adresse, fontBold, 16, LAYOUT.contentWidth);
+    side.drawText(safePDF("Bolig"), {
+      x: LAYOUT.marginX, y: metaY,
+      size: 8.5, font: fontBold, color: COLORS.textMuted,
+    });
+    metaY -= 18;
+    adresseLinjer.slice(0, 2).forEach(linje => {
+      side.drawText(safePDF(linje), {
+        x: LAYOUT.marginX, y: metaY,
+        size: 16, font: fontBold, color: COLORS.textPrimary,
+      });
+      metaY -= 22;
+    });
+    metaY -= 12;
+  }
+
+  // Dato
+  side.drawText(safePDF("Rapportdato"), {
+    x: LAYOUT.marginX, y: metaY,
+    size: 8.5, font: fontBold, color: COLORS.textMuted,
+  });
+  metaY -= 18;
+  side.drawText(safePDF(dato), {
+    x: LAYOUT.marginX, y: metaY,
+    size: 14, font: fontNormal, color: COLORS.textPrimary,
+  });
+
+  // Bunntekst
+  side.drawRectangle({
+    x: 0, y: 0, width: LAYOUT.pageWidth, height: 1,
+    color: COLORS.border,
+  });
+  side.drawText(safePDF("Utarbeidet av BoligEffekt"), {
+    x: LAYOUT.marginX, y: 50,
+    size: 11, font: fontBold, color: COLORS.primary,
+  });
+  side.drawText(safePDF("boligeffekt.no"), {
+    x: LAYOUT.pageWidth - LAYOUT.marginX - fontNormal.widthOfTextAtSize("boligeffekt.no", 10), y: 50,
+    size: 10, font: fontNormal, color: COLORS.textSecondary,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
 // HOVED-FUNKSJON
 // ─────────────────────────────────────────────────────────────
 
@@ -382,7 +474,12 @@ async function lagPDF(data, pakke) {
   const totSider = pakke === "oppgraderingsplan" ? 10 : 1;
 
   // ═══════════════════════════════════════════════════════════
-  // SIDE 1 — FORSIDE / SAMMENDRAG
+  // FORSIDE (cover) — ren, ingen tunge elementer, ingen emoji
+  // ═══════════════════════════════════════════════════════════
+  tegnForside(pdfDoc, data, fontNormal, fontBold);
+
+  // ═══════════════════════════════════════════════════════════
+  // SIDE 1 — SAMMENDRAG
   // ═══════════════════════════════════════════════════════════
   const side1 = pdfDoc.addPage([LAYOUT.pageWidth, LAYOUT.pageHeight]);
   sideHeader(side1, pakke === "oppgraderingsplan" ? "Oppgraderingsplan" : "Energirapport", 1, totSider, fontNormal, fontBold);

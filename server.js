@@ -22,6 +22,11 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 // onboarding@resend.dev er eneste avsender som fungerer uten domene-verifisering i Resend test-modus
 const FROM_EMAIL = "rapport@boligeffekt.no";
 
+// FREE_MODE: hopp over Stripe-verifisering og la rapporten genereres gratis.
+// Brukes for feedback-runder før vi tar penger. Stripe-infrastrukturen blir værende.
+const FREE_MODE = process.env.FREE_MODE === "true";
+console.log("FREE_MODE:", FREE_MODE ? "PÅ (Stripe-gate bypasset)" : "av");
+
 const ALLOWED_ORIGINS = [
   "https://boligeffekt.no",
   "https://www.boligeffekt.no",
@@ -316,7 +321,9 @@ app.post("/api/send-rapport", async (req, res) => {
     const { session_id, resultatData, epost, pakke } = req.body;
 
     // Validering
-    if (!session_id || typeof session_id !== "string" || !/^cs_[a-zA-Z0-9_]{10,}$/.test(session_id))
+    const erStripeSession = typeof session_id === "string" && /^cs_[a-zA-Z0-9_]{10,}$/.test(session_id);
+    const erFreeSession   = FREE_MODE && typeof session_id === "string" && /^free_[a-zA-Z0-9_]{1,40}$/.test(session_id);
+    if (!erStripeSession && !erFreeSession)
       return res.status(400).json({ feil: "Ugyldig session_id" });
     if (epost && !erEpost(epost))
       return res.status(400).json({ feil: "Ugyldig e-postadresse" });
@@ -331,18 +338,28 @@ app.post("/api/send-rapport", async (req, res) => {
       console.log("[RAPPORT] resultat.tiltak antall:", resultatData.resultat.tiltak ? resultatData.resultat.tiltak.length : "MANGLER");
     }
 
-    // Verifiser betaling
-    console.log("[RAPPORT] Verifiserer betaling hos Stripe...");
-    const session = await stripe.checkout.sessions.retrieve(session_id);
-    console.log("[RAPPORT] Stripe payment_status:", session.payment_status);
+    let kundeEpost;
+    let valgtPakke;
 
-    if (session.payment_status !== "paid") {
-      console.error("[RAPPORT] Betaling ikke bekreftet!");
-      return res.status(403).json({ feil: "Betaling ikke bekreftet" });
+    if (erFreeSession) {
+      console.log("[RAPPORT] FREE_MODE - hopper over Stripe-verifisering");
+      if (!epost) return res.status(400).json({ feil: "Mangler e-postadresse" });
+      kundeEpost = epost;
+      valgtPakke = pakke || "oppgraderingsplan";
+    } else {
+      // Verifiser betaling
+      console.log("[RAPPORT] Verifiserer betaling hos Stripe...");
+      const session = await stripe.checkout.sessions.retrieve(session_id);
+      console.log("[RAPPORT] Stripe payment_status:", session.payment_status);
+
+      if (session.payment_status !== "paid") {
+        console.error("[RAPPORT] Betaling ikke bekreftet!");
+        return res.status(403).json({ feil: "Betaling ikke bekreftet" });
+      }
+
+      kundeEpost = epost || session.customer_email;
+      valgtPakke = pakke || session.metadata?.pakke || "energirapport";
     }
-
-    const kundeEpost  = epost || session.customer_email;
-    const valgtPakke  = pakke || session.metadata?.pakke || "energirapport";
     console.log("[RAPPORT] Kunde e-post:", kundeEpost, "| Pakke:", valgtPakke);
 
     // Generer PDF
@@ -431,6 +448,48 @@ app.post("/api/lead", async (req, res) => {
     });
   } catch (err) {
     console.error("[LEAD] E-post feil:", err.message);
+  }
+
+  res.json({ ok: true });
+});
+
+// 5b. Feedback fra FREE_MODE
+app.post("/api/feedback", async (req, res) => {
+  const { betalingsvilje, kommentar, merke } = req.body || {};
+
+  const GYLDIG_VALG = ["199", "399", "nei"];
+  if (!betalingsvilje || !GYLDIG_VALG.includes(betalingsvilje))
+    return res.status(400).json({ feil: "Ugyldig valg" });
+  if (kommentar && (typeof kommentar !== "string" || kommentar.length > 1000))
+    return res.status(400).json({ feil: "Ugyldig kommentar" });
+  if (merke && (typeof merke !== "string" || !/^[A-G]?$/.test(merke)))
+    return res.status(400).json({ feil: "Ugyldig merke" });
+
+  const sValg     = escHtml(betalingsvilje);
+  const sKomm     = escHtml(kommentar || "(ingen kommentar)");
+  const sMerke    = escHtml(merke || "-");
+  const sNår      = new Date().toLocaleString("nb-NO");
+
+  console.log(`[FEEDBACK] valg=${sValg} merke=${sMerke} kommentar="${(kommentar||"").slice(0,120)}"`);
+
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: "andrislhelle@gmail.com",
+      subject: `Feedback FREE_MODE: ${sValg}`,
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#f0ede8;padding:0 0 28px">
+          <div style="background:#1b3a5c;padding:22px 28px"><h2 style="color:white;margin:0;font-size:18px">BoligEffekt - Feedback</h2></div>
+          <div style="padding:24px 28px">
+            <table style="width:100%;border-collapse:collapse;background:white;border-radius:10px;overflow:hidden">
+              ${[["Ville du betalt?", sValg], ["Energimerke", sMerke], ["Tidspunkt", sNår], ["Kommentar", sKomm]]
+                .map(([k, v]) => `<tr><td style="padding:11px 16px;color:#6b7a8d;font-size:13px;border-bottom:1px solid #f0ede8;width:38%">${k}</td><td style="padding:11px 16px;color:#0f2540;font-size:13px;border-bottom:1px solid #f0ede8;white-space:pre-wrap">${v}</td></tr>`).join("")}
+            </table>
+          </div>
+        </div>`,
+    });
+  } catch (err) {
+    console.error("[FEEDBACK] E-post feil:", err.message);
   }
 
   res.json({ ok: true });
