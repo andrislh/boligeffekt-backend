@@ -495,6 +495,46 @@ app.post("/api/feedback", async (req, res) => {
   res.json({ ok: true });
 });
 
+// 5c. Benchmark mot Enova-data (energimerker per byggeår-bøtte)
+// Statisk lest fra data/enova-stats.json, oppdateres via enova-import.js.
+const path = require("path");
+let enovaStats = null;
+try {
+  enovaStats = require(path.join(__dirname, "data", "enova-stats.json"));
+} catch (_) {
+  console.log("[BENCHMARK] data/enova-stats.json mangler - /api/benchmark returnerer tom respons");
+}
+
+function byggeårBøtte(år) {
+  if (!år || isNaN(år)) return null;
+  if (år < 1950) return "Før 1950";
+  if (år < 1970) return "1950-1969";
+  if (år < 1987) return "1970-1986";
+  if (år < 1998) return "1987-1997";
+  if (år < 2008) return "1998-2007";
+  if (år < 2018) return "2008-2017";
+  return "Etter 2017";
+}
+
+app.get("/api/benchmark", (req, res) => {
+  const år = parseInt(req.query.byggeår, 10);
+  const bøtte = byggeårBøtte(år);
+  if (!bøtte) return res.status(400).json({ feil: "Ugyldig byggeår" });
+  if (!enovaStats || !enovaStats.perByggeårBøtte || !enovaStats.perByggeårBøtte[bøtte] || enovaStats.totaltAttester === 0) {
+    return res.json({ tilgjengelig: false, bøtte });
+  }
+  const a = enovaStats.perByggeårBøtte[bøtte];
+  res.json({
+    tilgjengelig:   true,
+    bøtte,
+    totalt:         a.totalt,
+    medianMerke:    a.median,
+    snittKwhPerM2:  a.snittKwhPerM2,
+    perMerke:       a.perMerke,
+    oppdatert:      enovaStats.generertNår,
+  });
+});
+
 // 6. Helsesjekk
 app.get("/", (req, res) => res.json({ status: "ok" }));
 
