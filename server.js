@@ -35,6 +35,12 @@ const ALLOWED_ORIGINS = [
 
 const app = express();
 
+// ── Proxy-tillit (Railway) ────────────────────────────────────
+// Railway kjører bak en reverse proxy. Uten dette ser express-rate-limit
+// proxyens IP for ALLE brukere – én felles kvote som sperrer ekte kunder,
+// og req.ip blir feil. "1" = stol på første proxy-hopp.
+app.set("trust proxy", 1);
+
 // ── Sikkerhetsheadere ─────────────────────────────────────────
 app.use(helmet());
 
@@ -168,7 +174,9 @@ async function sendEpostOppgradering(epostAdresse, pdfBytes, data) {
   const breakEven = totBes > 0 ? Math.round(netto / totBes) : "–";
   const bestTiltak = høy[0];
   const top3 = høy.slice(0, 3);
-  const kwhSpart = høy.reduce((s, t) => s + Math.round(totalKwh * t.kWh_pct), 0);
+  // kWh_pct er andel av OPPVARMINGSbehovet – bruk oppvarmingKwh når frontend sender det
+  const oppvKwh = data.resultat.oppvarmingKwh ?? totalKwh;
+  const kwhSpart = høy.reduce((s, t) => s + Math.round(oppvKwh * t.kWh_pct), 0);
   const søknadstekst = `Jeg søker om støtte til energitiltak i min bolig. Boligen ble bygget i perioden ${bygData.label} og har i dag estimert energimerke ${merke.merke}. Tiltakene jeg planlegger å gjennomføre er: ${høy.map(t => t.navn).join(", ")}. Forventet energibesparelse er ca. ${kwhSpart.toLocaleString("no")} kWh per år, noe som tilsvarer ca. ${totBes.toLocaleString("no")} kroner i reduserte strømutgifter. Tiltakene vil forbedre boligens energimerke fra ${merke.merke} til estimert ${merkePotensial ? merkePotensial.merke : "B"}.`;
 
   const result = await resend.emails.send({
@@ -611,7 +619,7 @@ app.post("/api/nyheter", async (req, res) => {
       max_tokens: 1200,
       messages: [{
         role: "user",
-        content: `Generer 5 relevante og realistiske nyhetsoverskrifter med sammendrag om norsk energimerking, Enova-støtte, EPBD-direktivet, TEK17 og boligoppgradering i Norge. Bruk dagens dato (${new Date().toLocaleDateString("nb-NO")}) og gjeldende regelverk. Svar KUN med JSON-array uten annen tekst:\n[{"tittel":"...","sammendrag":"...","dato":"DD.MM.ÅÅÅÅ","kilde":"Enova.no"},...]`
+        content: `Lag 5 korte, faktabaserte oppsummeringer om norsk energimerking, Enova-støtteordninger, EPBD-direktivet, TEK17 og boligoppgradering i Norge. VIKTIG: Ikke finn på nyhetshendelser, datoer eller kilder – beskriv kun faktisk gjeldende regelverk og ordninger du er sikker på. Bruk "kilde" til å angi hvilket tema/regelverk det gjelder (f.eks. "Enova-ordningen", "EPBD 2024"), og sett "dato" til "${new Date().toLocaleDateString("nb-NO")}" (genereringsdato). Svar KUN med JSON-array uten annen tekst:\n[{"tittel":"...","sammendrag":"...","dato":"DD.MM.ÅÅÅÅ","kilde":"..."},...]`
       }],
     });
     const tekst = response.content[0]?.text || "[]";
