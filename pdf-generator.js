@@ -464,7 +464,9 @@ async function lagPDF(data, pakke) {
   const totBes          = (tiltak || []).reduce((s, t) => s + (t.besparelse_kr || 0), 0);
   const totBes20        = totBes * 20;
   // CO2: estimert basert på nordisk strømmiks 17 g CO2/kWh + fossil andel
-  const kwhSpart        = (tiltak || []).reduce((s, t) => s + Math.round(totalKwh * (t.kWh_pct || 0)), 0);
+  // kWh_pct er andel av OPPVARMINGSbehovet – bruk oppvarmingKwh når den finnes
+  const grunnlagKwh     = data.resultat.oppvarmingKwh ?? totalKwh;
+  const kwhSpart        = (tiltak || []).reduce((s, t) => s + Math.round(grunnlagKwh * (t.kWh_pct || 0)), 0);
   const totCO2KgÅr      = Math.round(kwhSpart * 0.017);
 
   const pdfDoc     = await PDFDocument.create();
@@ -967,7 +969,7 @@ async function lagPDF(data, pakke) {
   if (y8 > 140 && enovaTiltak.length > 0) {
     seksjonHeader(side8, "Ferdig søknadstekst (kopier og lim inn)", 40, y8, fontBold);
     y8 -= 14;
-    const enovaKwhSpart = enovaTiltak.reduce((s, t) => s + Math.round(totalKwh * (t.kWh_pct || 0)), 0);
+    const enovaKwhSpart = enovaTiltak.reduce((s, t) => s + Math.round((data.resultat.oppvarmingKwh ?? totalKwh) * (t.kWh_pct || 0)), 0);
     const enovaBes = enovaTiltak.reduce((s, t) => s + (t.besparelse_kr || 0), 0);
     const sokTekst = `Jeg søker om støtte til energitiltak i min bolig. Boligen ble bygget i perioden ${bygData?.label || "-"} og har i dag estimert energimerke ${merke?.merke || "-"}. Tiltakene jeg planlegger er: ${enovaTiltak.map(t => t.navn).join(", ")}. Forventet energibesparelse er ca. ${enovaKwhSpart.toLocaleString("no")} kWh/år, tilsvarende ca. ${fmtKrÅr(enovaBes)} i reduserte strømutgifter. Tiltakene vil forbedre boligens energimerke fra ${merke?.merke || "-"} til estimert ${merkePotensial?.merke || "-"}.`;
     const sokLinjer = wrapText(sokTekst, fontNormal, 8.5, LAYOUT.contentWidth - 20);
