@@ -503,6 +503,84 @@ app.post("/api/feedback", async (req, res) => {
   res.json({ ok: true });
 });
 
+// 5d. E-postfangst fra betalingsmuren – fanger leads som IKKE kjøper med en gang.
+// Sender brukeren et kort sammendrag av energimerket (oppfyller løftet på muren)
+// og varsler eier om lead-en for oppfølging. Beskyttet av global rate-limit.
+app.post("/api/capture-lead", async (req, res) => {
+  const { epost, merke, kwhPerM2, tiltak, kilde } = req.body || {};
+
+  if (!epost || !erEpost(epost))
+    return res.status(400).json({ feil: "Ugyldig e-post" });
+  if (merke && (typeof merke !== "string" || !/^[A-G]?$/.test(merke)))
+    return res.status(400).json({ feil: "Ugyldig merke" });
+  if (kwhPerM2 != null && (typeof kwhPerM2 !== "number" || kwhPerM2 < 0 || kwhPerM2 > 2000))
+    return res.status(400).json({ feil: "Ugyldig kWh" });
+  if (tiltak && (!Array.isArray(tiltak) || tiltak.length > 20))
+    return res.status(400).json({ feil: "Ugyldig tiltak" });
+
+  const sEpost  = escHtml(epost);
+  const sMerke  = escHtml(merke || "-");
+  const sKwh    = Number.isFinite(kwhPerM2) ? Math.round(kwhPerM2) : null;
+  const tListe  = Array.isArray(tiltak) ? tiltak.map(t => String(t).slice(0, 80)).filter(Boolean).slice(0, 3) : [];
+  const sTiltak = tListe.map(escHtml);
+  const sKilde  = escHtml((typeof kilde === "string" ? kilde : "betalingsmur").slice(0, 40));
+  const sNår    = new Date().toLocaleString("nb-NO");
+  const lenke   = process.env.FRONTEND_URL || "https://boligeffekt.no";
+
+  console.log(`[CAPTURE] e-postfangst merke=${sMerke} kilde=${sKilde}`);
+
+  // 1) Sammendrag til brukeren (det de ba om)
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: epost,
+      subject: `Energimerket på boligen din: Merke ${sMerke}`,
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#f4f0e8;padding:0 0 28px">
+          <div style="background:#1b3a5c;padding:22px 28px"><h2 style="color:white;margin:0;font-size:18px">BoligEffekt</h2></div>
+          <div style="padding:26px 28px">
+            <p style="color:#0f2540;font-size:15px;margin:0 0 14px">Hei, og takk for at du brukte BoligEffekt.</p>
+            <p style="color:#0f2540;font-size:15px;margin:0 0 18px">Her er energiestimatet for boligen din:</p>
+            <table style="width:100%;border-collapse:collapse;background:white;border-radius:10px;overflow:hidden;margin-bottom:18px">
+              <tr><td style="padding:12px 16px;color:#6b7a8d;font-size:13px;border-bottom:1px solid #f0ede8;width:50%">Estimert energimerke</td><td style="padding:12px 16px;font-weight:700;color:#0f2540;font-size:13px;border-bottom:1px solid #f0ede8">Merke ${sMerke}</td></tr>
+              ${sKwh != null ? `<tr><td style="padding:12px 16px;color:#6b7a8d;font-size:13px">Beregnet forbruk</td><td style="padding:12px 16px;font-weight:700;color:#0f2540;font-size:13px">${sKwh} kWh/m²/år</td></tr>` : ""}
+            </table>
+            ${sTiltak.length ? `<p style="color:#0f2540;font-size:14px;margin:0 0 6px"><strong>Tiltak vi vil prioritere for din bolig:</strong></p><ul style="color:#0f2540;font-size:14px;margin:0 0 18px;padding-left:20px">${sTiltak.map(t => `<li style="margin-bottom:4px">${t}</li>`).join("")}</ul>` : ""}
+            <p style="color:#0f2540;font-size:14px;margin:0 0 18px;line-height:1.6">Hele tiltaksplanen – med Enova-støtte, tilbakebetalingstid og rekkefølge – ligger klar i rapporten din.</p>
+            <a href="${lenke}" style="display:inline-block;background:#2AB55A;color:white;text-decoration:none;font-weight:700;font-size:14px;padding:13px 26px;border-radius:10px">Se hele rapporten →</a>
+            <p style="color:#9aa7b4;font-size:11px;margin:22px 0 0;line-height:1.5">Estimat, ikke offisiell energiattest. Du fikk denne e-posten fordi du ba om et sammendrag på boligeffekt.no.</p>
+          </div>
+        </div>`,
+    });
+  } catch (err) {
+    console.error("[CAPTURE] Bruker-e-post feil:", err.message);
+  }
+
+  // 2) Varsling til eier (lead for oppfølging)
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: "andrislhelle@gmail.com",
+      subject: `Ny e-postfangst: Merke ${sMerke}`,
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#f0ede8;padding:0 0 28px">
+          <div style="background:#1b3a5c;padding:22px 28px"><h2 style="color:white;margin:0;font-size:18px">BoligEffekt – E-postfangst</h2></div>
+          <div style="padding:24px 28px">
+            <table style="width:100%;border-collapse:collapse;background:white;border-radius:10px;overflow:hidden">
+              ${[["E-post", sEpost], ["Energimerke", `Merke ${sMerke}`], ["Kilde", sKilde], ["Tidspunkt", sNår]]
+                .map(([k, v]) => `<tr><td style="padding:11px 16px;color:#6b7a8d;font-size:13px;border-bottom:1px solid #f0ede8;width:38%">${k}</td><td style="padding:11px 16px;font-weight:700;color:#0f2540;font-size:13px;border-bottom:1px solid #f0ede8">${v}</td></tr>`).join("")}
+            </table>
+            <p style="color:#6b7a8d;font-size:12px;margin:16px 0 0">Lead fanget på betalingsmuren (kjøpte ikke umiddelbart). Følg opp med rapport/Enova-tips.</p>
+          </div>
+        </div>`,
+    });
+  } catch (err) {
+    console.error("[CAPTURE] Eier-varsling feil:", err.message);
+  }
+
+  res.json({ ok: true });
+});
+
 // 5c. Benchmark mot Enova-data (energimerker per byggeår-bøtte)
 // Statisk lest fra data/enova-stats.json, oppdateres via enova-import.js.
 const path = require("path");
