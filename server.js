@@ -415,7 +415,7 @@ app.post("/webhook", async (req, res) => {
 
 // 5. Lead-registrering
 app.post("/api/lead", async (req, res) => {
-  const { navn, telefon, epost, merke, tiltak } = req.body;
+  const { navn, telefon, epost, merke, tiltak, region, tidsramme, samtykke } = req.body;
 
   // Validering
   if (!navn || typeof navn !== "string" || navn.length > 100)
@@ -428,15 +428,27 @@ app.post("/api/lead", async (req, res) => {
     return res.status(400).json({ feil: "Ugyldig merke" });
   if (tiltak && (!Array.isArray(tiltak) || tiltak.length > 20))
     return res.status(400).json({ feil: "Ugyldig tiltak" });
+  if (region && (typeof region !== "string" || region.length > 120))
+    return res.status(400).json({ feil: "Ugyldig region" });
+  if (tidsramme && (typeof tidsramme !== "string" || tidsramme.length > 40))
+    return res.status(400).json({ feil: "Ugyldig tidsramme" });
+  // Samtykke registreres (frontend krever avkrysning før innsending). Vi avviser
+  // IKKE manglende samtykke her – det ville koblet deploy-rekkefølgen frontend/backend
+  // og brutt det live lead-skjemaet i deploy-vinduet. Leads uten samtykke skal ikke formidles.
+  if (samtykke != null && typeof samtykke !== "boolean")
+    return res.status(400).json({ feil: "Ugyldig samtykke" });
 
   console.log("[LEAD] Ny lead mottatt");
 
   // Escape all user data before inserting into HTML
+  const TID_LABEL = { snarest: "Snarest mulig", "0-3": "Innen 3 mnd", "3-12": "Om 3–12 mnd", orientering: "Bare orientering" };
   const sNavn    = escHtml(navn);
   const sTelefon = escHtml(telefon);
   const sEpost   = escHtml(epost || "–");
   const sMerke   = escHtml(merke || "–");
   const sTiltak  = escHtml(Array.isArray(tiltak) ? tiltak.map(t => String(t).slice(0, 80)).join(", ") : "–");
+  const sRegion  = escHtml(region || "–");
+  const sTid     = escHtml(TID_LABEL[tidsramme] || tidsramme || "–");
 
   try {
     await resend.emails.send({
@@ -448,7 +460,7 @@ app.post("/api/lead", async (req, res) => {
           <div style="background:#1b3a5c;padding:22px 28px"><h2 style="color:white;margin:0;font-size:18px">BoligEffekt – Ny lead</h2></div>
           <div style="padding:24px 28px">
             <table style="width:100%;border-collapse:collapse;background:white;border-radius:10px;overflow:hidden">
-              ${[["Navn", sNavn], ["Telefon", sTelefon], ["E-post", sEpost], ["Energimerke", `Merke ${sMerke}`], ["Topp tiltak", sTiltak]]
+              ${[["Navn", sNavn], ["Telefon", sTelefon], ["E-post", sEpost], ["Region", sRegion], ["Energimerke", `Merke ${sMerke}`], ["Tidsramme", sTid], ["Tiltak (fag)", sTiltak], ["Samtykke deling", samtykke === true ? "Ja" : "NEI – ikke formidle"]]
                 .map(([k, v]) => `<tr><td style="padding:11px 16px;color:#6b7a8d;font-size:13px;border-bottom:1px solid #f0ede8;width:38%">${k}</td><td style="padding:11px 16px;font-weight:700;color:#0f2540;font-size:13px;border-bottom:1px solid #f0ede8">${v}</td></tr>`).join("")}
             </table>
           </div>
